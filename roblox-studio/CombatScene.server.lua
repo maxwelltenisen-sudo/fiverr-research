@@ -12,7 +12,6 @@ local Debris = game:GetService("Debris")
 ---------------------------------------------------------------- settings
 local SCENES_TO_PLAY = { 1, 2, 3, 4 }
 local SCENE_GAP = 4
-local ARM_SIGN = 1          -- if punches swing backwards, change to -1
 
 Players.CharacterAutoLoads = false
 
@@ -93,11 +92,6 @@ local function makeFighter(name, pos, colors, facing)
 	m.Parent = Workspace
 	m:PivotTo(CFrame.lookAt(pos + Vector3.new(0, 3, 0), facing))
 	m.Humanoid.WalkSpeed = 40
-	base[m] = {}
-	for _, j in ipairs({ "RightShoulder", "LeftShoulder", "Waist", "RightHip", "LeftHip" }) do
-		local motor = m:FindFirstChild(j, true)
-		if motor then base[m][j] = { motor = motor, c0 = motor.C0 } end
-	end
 	return m
 end
 
@@ -126,30 +120,21 @@ local knife = makePart({ Size = Vector3.new(0.25, 0.25, 2.2), Color = Color3.fro
 weld(knife, toji.RightHand, CFrame.new(0, -0.3, -1.2))
 knife.Transparency = 1   -- hidden until drawn
 
-local RunService = game:GetService("RunService")
-local twId = 0
-local function lerpC0(motor, goal, time)
-	twId = twId + 1
-	local myId = twId
-	motor:SetAttribute("tw", myId)
-	local start = motor.C0
-	task.spawn(function()
-		local t0 = os.clock()
-		while motor:GetAttribute("tw") == myId do
-			local a = math.min((os.clock() - t0) / math.max(time, 0.01), 1)
-			motor.C0 = start:Lerp(goal, a)
-			if a >= 1 then break end
-			RunService.Heartbeat:Wait()
-		end
-	end)
-end
-
-local function pose(model, joint, rot, time)
-	local j = base[model][joint]
-	if j then lerpC0(j.motor, j.c0 * CFrame.Angles(rot.X, rot.Y, rot.Z), time or 0.12) end
-end
-local function resetPose(model, time)
-	for _, j in pairs(base[model]) do lerpC0(j.motor, j.c0, time or 0.2) end
+local ANIM = {
+	walk = "rbxassetid://507777826",
+	slash = "rbxassetid://522635514",
+	lunge = "rbxassetid://522638767",
+	point = "rbxassetid://507770453",
+}
+local function playAnim(model, name, looped)
+	local hum = model:FindFirstChildOfClass("Humanoid")
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+	local anim = Instance.new("Animation")
+	anim.AnimationId = ANIM[name]
+	local track = animator:LoadAnimation(anim)
+	track.Looped = looped or false
+	track:Play()
+	return track
 end
 local function root(m) return m.HumanoidRootPart end
 local function lookAt(m, target)
@@ -158,9 +143,7 @@ local function lookAt(m, target)
 end
 local function dashTo(m, pos)
 	local hum = m.Humanoid
-	local anim = Instance.new("Animation"); anim.AnimationId = ANIM_WALK
-	local track = (hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)):LoadAnimation(anim)
-	track.Looped = true; track:Play()
+	local track = playAnim(m, "walk", true)
 	hum:MoveTo(pos); hum.MoveToFinished:Wait()
 	track:Stop()
 end
@@ -172,14 +155,10 @@ local function knockback(m, dir, power)
 	Debris:AddItem(bv, 0.25)
 end
 local function punch(m, right)
-	local joint = right and "RightShoulder" or "LeftShoulder"
-	pose(m, joint, Vector3.new(-1.7 * ARM_SIGN, 0, 0), 0.08)
-	pose(m, "Waist", Vector3.new(0, right and -0.5 or 0.5, 0), 0.08)
-	task.wait(0.15)
-	resetPose(m, 0.15)
+	playAnim(m, right and "slash" or "lunge")
+	task.wait(0.35)
 end
 
----------------------------------------------------------------- effects
 local function orb(color, size, pos)
 	local p = makePart({ Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), Position = pos,
 		Color = color, Material = Enum.Material.Neon, Transparency = 0.1 })
@@ -234,9 +213,8 @@ end
 
 scenes[3] = function() -- Toji's blade breaks the barrier
 	local barrier = scenes._barrier
-	pose(toji, "RightShoulder", Vector3.new(-2.6 * ARM_SIGN, 0, 0), 0.25)
+	playAnim(toji, "lunge")
 	shot(root(toji).Position + Vector3.new(-3, 3, -9), root(toji).Position + Vector3.new(0, 4, 0), 1.2, 0, 40)
-	pose(toji, "RightShoulder", Vector3.new(-1.2 * ARM_SIGN, 0, 0), 0.08)
 	task.wait(0.1)
 	if barrier then barrier:Destroy() end
 	burst(Vector3.new(-3, 5, 0), Color3.fromRGB(160, 220, 255), 25)
@@ -244,15 +222,13 @@ scenes[3] = function() -- Toji's blade breaks the barrier
 	shake(1.5, 0.5)
 	knockback(gojo, Vector3.new(-1, 0, 0), 60)
 	shot(Vector3.new(-12, 6, -22), Vector3.new(-6, 5, 0), 2, 1.5, 55)
-	resetPose(toji, 0.3)
 end
 
 scenes[4] = function() -- Blue + Red = Purple
 	lookAt(gojo, root(toji).Position)
 	local blue = orb(Color3.fromRGB(40, 120, 255), 4, root(gojo).Position + Vector3.new(-3, 5, -3))
 	local red = orb(Color3.fromRGB(255, 40, 60), 4, root(gojo).Position + Vector3.new(3, 5, -3))
-	pose(gojo, "RightShoulder", Vector3.new(-1.6 * ARM_SIGN, 0, 0), 0.2)
-	pose(gojo, "LeftShoulder", Vector3.new(-1.6 * ARM_SIGN, 0, 0), 0.2)
+	local cast = playAnim(gojo, "point", true)
 	shot(root(gojo).Position + Vector3.new(0, 4, -16), root(gojo).Position + Vector3.new(0, 4, 0), 2, 0.3, 50)
 	local mergeAt = root(gojo).Position + Vector3.new(0, 6, -6)
 	tween(blue, 0.8, { Position = mergeAt }); tween(red, 0.8, { Position = mergeAt })
@@ -267,7 +243,7 @@ scenes[4] = function() -- Blue + Red = Purple
 	knockback(toji, Vector3.new(1, 0, 0), 90)
 	shake(3, 1)
 	shot(root(toji).Position + Vector3.new(-14, 8, -22), root(toji).Position, 2.5, 3, 80)
-	resetPose(gojo, 0.4)
+	cast:Stop()
 	shot(root(gojo).Position + Vector3.new(4, 3, -9), root(gojo).Position + Vector3.new(0, 4, 0), 3, 0, 40)
 end
 

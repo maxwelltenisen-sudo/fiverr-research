@@ -1,4 +1,5 @@
 -- LocalScript: put in StarterPlayer > StarterPlayerScripts.
+print("Camera LocalScript started")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
