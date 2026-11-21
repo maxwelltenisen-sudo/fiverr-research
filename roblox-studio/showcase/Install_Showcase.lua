@@ -832,21 +832,37 @@ local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
 local fighters = { Blue = stage:WaitForChild("Blue"), Purple = stage:WaitForChild("Purple") }
 for _, m in pairs(fighters) do
-	m:WaitForChild("HumanoidRootPart"); m:WaitForChild("RightFoot"); m:WaitForChild("UpperTorso")
-	m:WaitForChild("LowerTorso"):WaitForChild("Root")
+	m:WaitForChild("HumanoidRootPart"); m:WaitForChild("RightFoot"); m:WaitForChild("UpperTorso"); m:WaitForChild("LowerTorso")
 end
 
 ---------------------------------------------------------------- rig + bake
+-- Joints are found by the part they move (Part1), so it works whatever the Motor6D is named.
+local PART1 = { Root = "LowerTorso", Waist = "UpperTorso", Neck = "Head",
+	RightShoulder = "RightUpperArm", RightElbow = "RightLowerArm", RightWrist = "RightHand",
+	LeftShoulder = "LeftUpperArm", LeftElbow = "LeftLowerArm", LeftWrist = "LeftHand",
+	RightHip = "RightUpperLeg", RightKnee = "RightLowerLeg", RightAnkle = "RightFoot",
+	LeftHip = "LeftUpperLeg", LeftKnee = "LeftLowerLeg", LeftAnkle = "LeftFoot" }
+local function findJoint(model, n)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("Motor6D") and d.Part1 and d.Part1.Name == PART1[n] and d.Part0 and not d.Name:find("Scarf") then
+			return d
+		end
+	end
+end
 local function readRig(model)
 	local defs = {}
 	for _, n in ipairs(Engine.JOINTS) do
-		local m = model:FindFirstChild(n, true)
+		local m = findJoint(model, n)
 		local waited = 0
-		while not (m and m:IsA("Motor6D")) and waited < 15 do   -- joints stream in after the model appears
-			task.wait(0.1); waited = waited + 0.1
-			m = model:FindFirstChild(n, true)
+		while not m and waited < 10 do task.wait(0.1); waited = waited + 0.1; m = findJoint(model, n) end
+		if not m then
+			local names = {}
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("Motor6D") then table.insert(names, d.Name .. "(" .. d.Parent.Name .. ")") end
+			end
+			warn("ShowcaseDirector: joint for " .. n .. " not found on " .. model.Name .. ". Motor6Ds present: " .. table.concat(names, ", "))
+			error("missing joint " .. n)
 		end
-		assert(m and m:IsA("Motor6D"), "ShowcaseDirector: missing joint " .. n .. " on " .. model.Name)
 		defs[n] = { c0 = m.C0, c1 = m.C1, motor = m }
 	end
 	return defs, { footY = model.RightFoot.Size.Y, footZ = model.RightFoot.Size.Z }
