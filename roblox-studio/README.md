@@ -30,3 +30,9 @@ a blade breaking through, then blue + red energy merging into a purple blast. It
 Untested in Studio. The characters are built from simple parts (hair, blindfold, scar, knife), so no
 asset ids are needed. These are fan-made versions of anime characters: fine for a fan channel, but
 monetised videos can get copyright claims, so original characters are safer long term.
+
+## Combat scene v2 (dark ruins, lightning, post-processing)
+`CombatScene_v2.server.lua` replaces the first combat script (delete or disable the old one).
+Adds fog, bloom, a purple moon, ruins, floating rocks, fighters with spiky hair / scarf / cloak /
+glowing trim, speed trails, lightning, shockwaves and tilted fast camera cuts. It prints `DEBUG`
+lines so problems are easy to diagnose. Untested in Studio.
