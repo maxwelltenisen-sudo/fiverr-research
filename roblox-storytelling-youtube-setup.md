@@ -84,3 +84,17 @@ CTA (last 3s): "Follow for Part 2"
 
 ## 9. Hashtags / tags
 `#roblox #robloxstory #robloxstorytime #robloxshorts #storytime #brookhaven #adoptme`
+
+## 10. Reference style: itsRedBear (from a screenshot, not a full review)
+Observed on the channel page: 55.7k subs, 21 videos, Shorts at roughly 282k to 12M views each.
+
+What to copy as a *format* (do not copy their stories, name, mascot or art):
+- **Recurring mascot character.** One recognizable avatar (theirs wears a red bear hat) appears in many videos. Make your own original mascot, for example a storybook-themed avatar, and use it as the channel avatar too.
+- **Big word-by-word captions.** One to three bold words on screen at a time ("share", "no", "power", "Blocks fall from"), centered, with an outline. Do this in CapCut using auto-captions with a big font.
+- **Bright, saturated Roblox scenes** with the character large and centered in a vertical 9:16 frame, so the thumbnail frame works at tiny size.
+- **Mix of avatars.** Anime-style and cute avatars in different outfits, so every video looks distinct but stays on-brand.
+- **Fast, high-volume Shorts.** Short stories or "what if" scenarios told in seconds, which suits Shorts.
+- **Engagement hooks in the bio.** "comment for a cookie" gives viewers a reason to comment. Make your own version, such as "comment a ⭐ for Part 2".
+- **Channel Join (memberships)** button, which is available once you qualify for monetization.
+
+Takeaway: the shortest path to this look is one original mascot + loud word-by-word captions + bright maps + a 20-40 s story with a twist, posted several times a week.
