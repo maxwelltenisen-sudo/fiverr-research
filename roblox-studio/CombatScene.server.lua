@@ -68,8 +68,6 @@ lighting.Brightness = 2
 lighting.Ambient = Color3.fromRGB(60, 60, 90)
 
 ---------------------------------------------------------------- fighters
-local ANIM_WALK = "rbxassetid://507777826"
-local base = {}   -- original joint C0 values
 
 local function weld(part, to, offset)
 	part.Anchored = false
