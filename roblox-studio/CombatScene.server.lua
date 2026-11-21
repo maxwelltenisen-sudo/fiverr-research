@@ -126,12 +126,30 @@ local knife = makePart({ Size = Vector3.new(0.25, 0.25, 2.2), Color = Color3.fro
 weld(knife, toji.RightHand, CFrame.new(0, -0.3, -1.2))
 knife.Transparency = 1   -- hidden until drawn
 
+local RunService = game:GetService("RunService")
+local twId = 0
+local function lerpC0(motor, goal, time)
+	twId += 1
+	local myId = twId
+	motor:SetAttribute("tw", myId)
+	local start = motor.C0
+	task.spawn(function()
+		local t0 = os.clock()
+		while motor:GetAttribute("tw") == myId do
+			local a = math.min((os.clock() - t0) / math.max(time, 0.01), 1)
+			motor.C0 = start:Lerp(goal, a)
+			if a >= 1 then break end
+			RunService.Heartbeat:Wait()
+		end
+	end)
+end
+
 local function pose(model, joint, rot, time)
 	local j = base[model][joint]
-	if j then tween(j.motor, time or 0.12, { C0 = j.c0 * CFrame.Angles(rot.X, rot.Y, rot.Z) }) end
+	if j then lerpC0(j.motor, j.c0 * CFrame.Angles(rot.X, rot.Y, rot.Z), time or 0.12) end
 end
 local function resetPose(model, time)
-	for _, j in pairs(base[model]) do tween(j.motor, time or 0.2, { C0 = j.c0 }) end
+	for _, j in pairs(base[model]) do lerpC0(j.motor, j.c0, time or 0.2) end
 end
 local function root(m) return m.HumanoidRootPart end
 local function lookAt(m, target)
