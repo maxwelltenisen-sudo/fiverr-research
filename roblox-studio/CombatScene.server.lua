@@ -129,7 +129,7 @@ knife.Transparency = 1   -- hidden until drawn
 local RunService = game:GetService("RunService")
 local twId = 0
 local function lerpC0(motor, goal, time)
-	twId += 1
+	twId = twId + 1
 	local myId = twId
 	motor:SetAttribute("tw", myId)
 	local start = motor.C0
