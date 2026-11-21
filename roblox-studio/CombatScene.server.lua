@@ -67,6 +67,16 @@ lighting.ClockTime = 18.5
 lighting.Brightness = 2
 lighting.Ambient = Color3.fromRGB(60, 60, 90)
 
+-- With no player character, streaming has no focus point and sends nothing to the screen.
+-- Give every player a focus part at the arena centre so the world is visible.
+local focusPart = makePart({ Name = "FocusPoint", Size = Vector3.new(1, 1, 1),
+	Position = Vector3.new(0, 5, 0), Transparency = 1 })
+local function setFocus(plr)
+	pcall(function() plr.ReplicationFocus = focusPart end)
+end
+for _, plr in ipairs(Players:GetPlayers()) do setFocus(plr) end
+Players.PlayerAdded:Connect(setFocus)
+
 ---------------------------------------------------------------- fighters
 
 local function weld(part, to, offset)
