@@ -24,8 +24,22 @@ label.TextStrokeTransparency = 0
 label.Text = ""
 label.Parent = gui
 
+local RunService = game:GetService("RunService")
+local shakePower, shakeEnd = 0, 0
+RunService.RenderStepped:Connect(function()
+	if os.clock() < shakeEnd and shakePower > 0 then
+		local s = shakePower * 0.15
+		cam.CFrame = cam.CFrame * CFrame.new((math.random() - 0.5) * s, (math.random() - 0.5) * s, 0)
+	end
+end)
+
 remote.OnClientEvent:Connect(function(data)
+	if data.shake and data.shake > 0 then
+		shakePower, shakeEnd = data.shake, os.clock() + (data.time or 0.4)
+	end
+	if data.shakeOnly then return end
 	cam.CameraType = Enum.CameraType.Scriptable
-	TweenService:Create(cam, TweenInfo.new(data.tween, Enum.EasingStyle.Sine), { CFrame = data.cframe }):Play()
+	if data.fov then TweenService:Create(cam, TweenInfo.new(0.5), { FieldOfView = data.fov }):Play() end
+	TweenService:Create(cam, TweenInfo.new(data.tween or 0.7, Enum.EasingStyle.Sine), { CFrame = data.cframe }):Play()
 	label.Text = data.caption or ""
 end)

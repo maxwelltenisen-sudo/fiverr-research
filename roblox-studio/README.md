@@ -21,3 +21,12 @@ so every take looks identical.
   If anything errors, paste the Output message to me.
 - Characters are plain coloured R15 rigs. To use your own mascot, swap `makeNpc` for a model from your avatar.
 - Animation ids are Roblox's standard R15 ones; if one doesn't play, replace it in the `ANIM` table.
+
+## Combat scene (Gojo-style vs Toji-style)
+`CombatScene.server.lua` is a second Script for a 4-scene fight: standoff, clash against a barrier,
+a blade breaking through, then blue + red energy merging into a purple blast. It also needs
+`CameraAndCaptions.client.lua` (updated with screen shake and zoom). Use it **instead of** StoryBuilder
+(disable one of the two Scripts). If punches swing backwards, set `ARM_SIGN = -1` at the top.
+Untested in Studio. The characters are built from simple parts (hair, blindfold, scar, knife), so no
+asset ids are needed. These are fan-made versions of anime characters: fine for a fan channel, but
+monetised videos can get copyright claims, so original characters are safer long term.
