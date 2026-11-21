@@ -1,0 +1,9 @@
+{
+  "caption": {"font": "DejaVu Serif", "italic": true, "position": "bottom", "margin_v": 380,
+              "uppercase": false, "size": 110, "words_per_chunk": 3,
+              "colors": ["FFFFFF", "FFFFFF", "3CDC3C"]},
+  "scenes": [
+    {"clip": "clips/o1.mp4", "text": "Zeus gave the new king a pair of lightning gauntlets."},
+    {"clip": "clips/o2.mp4", "text": "But every god wanted them for themselves."}
+  ]
+}

@@ -79,6 +79,10 @@ def build_ass(scenes_timing, cfg, dest):
     size = cfg.get("size", 120)
     colors = cfg.get("colors", ["FFFFFF", "FFE600", "00F0FF"])
     n = max(1, cfg.get("words_per_chunk", 2))
+    italic = 1 if cfg.get("italic") else 0
+    align = 2 if cfg.get("position") == "bottom" else 5      # 2 = bottom centre, 5 = middle
+    margin_v = cfg.get("margin_v", 380 if align == 2 else 0)
+    upper = cfg.get("uppercase", True)
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -87,7 +91,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,10,4,5,60,60,0,1
+Style: Cap,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,{italic},0,0,100,100,0,0,1,10,4,{align},60,60,{margin_v},1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
@@ -105,7 +109,8 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
             col = colors[ci % len(colors)]
             ci += 1
             bgr = col[4:6] + col[2:4] + col[0:2]
-            txt = " ".join(c).replace("{", "(").replace("}", ")").upper()
+            txt = " ".join(c).replace("{", "(").replace("}", ")")
+            txt = txt.upper() if upper else txt
             pop = r"{\fscx70\fscy70\t(0,90,\fscx110\fscy110)\t(90,160,\fscx100\fscy100)"
             lines.append(f"Dialogue: 0,{ass_time(t)},{ass_time(t + d)},Cap,,0,0,0,,"
                          f"{pop}\\c&H{bgr}&" + "}" + txt)
