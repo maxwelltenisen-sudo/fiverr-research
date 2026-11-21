@@ -1,0 +1,12 @@
+{
+  "voice_name": "en-US-GuyNeural",
+  "caption": {"words_per_chunk": 2, "font": "Inter", "size": 120,
+              "colors": ["FFFFFF", "FFE600", "00F0FF"]},
+  "scenes": [
+    {"clip": "clips/01_spawn.mp4",   "text": "Nobody wanted the new kid on their team."},
+    {"clip": "clips/02_asking.mp4",  "text": "He asked three groups. Three times, he heard no."},
+    {"clip": "clips/03_tourney.mp4", "text": "Then the tournament started, and one team only had four players."},
+    {"clip": "clips/04_win.mp4",     "text": "So he joined them. And the noob won every single round."},
+    {"clip": "clips/05_end.mp4",     "text": "Now everyone wants him on their team. Part 2? Comment a star."}
+  ]
+}
