@@ -18,6 +18,7 @@ while not stage:GetAttribute("Ready") do task.wait(0.1) end
 local fighters = { Blue = stage:WaitForChild("Blue"), Purple = stage:WaitForChild("Purple") }
 for _, m in pairs(fighters) do
 	m:WaitForChild("HumanoidRootPart"); m:WaitForChild("RightFoot"); m:WaitForChild("UpperTorso")
+	m:WaitForChild("LowerTorso"):WaitForChild("Root")
 end
 
 ---------------------------------------------------------------- rig + bake
@@ -25,6 +26,11 @@ local function readRig(model)
 	local defs = {}
 	for _, n in ipairs(Engine.JOINTS) do
 		local m = model:FindFirstChild(n, true)
+		local waited = 0
+		while not (m and m:IsA("Motor6D")) and waited < 15 do   -- joints stream in after the model appears
+			task.wait(0.1); waited = waited + 0.1
+			m = model:FindFirstChild(n, true)
+		end
 		assert(m and m:IsA("Motor6D"), "ShowcaseDirector: missing joint " .. n .. " on " .. model.Name)
 		defs[n] = { c0 = m.C0, c1 = m.C1, motor = m }
 	end
