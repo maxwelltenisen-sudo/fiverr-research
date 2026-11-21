@@ -56,3 +56,24 @@ remote.OnClientEvent:Connect(function(data)
 	targetFov = data.fov or 70
 	label.Text = data.caption or ""
 end)
+
+-- DEBUG: prints what this client can see, 8 seconds after start.
+task.delay(8, function()
+	local g = workspace:FindFirstChild("Gojo")
+	print("DEBUG StreamingEnabled:", workspace.StreamingEnabled)
+	print("DEBUG found on client -> Ground:", workspace:FindFirstChild("Ground") ~= nil,
+		"Gojo:", g ~= nil, "Toji:", workspace:FindFirstChild("Toji") ~= nil)
+	local cam = workspace.CurrentCamera
+	print("DEBUG camera:", cam.CameraType, cam.CFrame.Position)
+	if g then
+		local total, visible = 0, 0
+		for _, d in ipairs(g:GetDescendants()) do
+			if d:IsA("BasePart") then
+				total = total + 1
+				if d.Transparency < 1 then visible = visible + 1 end
+			end
+		end
+		local r = g:FindFirstChild("HumanoidRootPart")
+		print("DEBUG Gojo parts:", total, "visible:", visible, "position:", r and r.Position)
+	end
+end)
