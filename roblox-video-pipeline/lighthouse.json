@@ -1,0 +1,65 @@
+{
+  "voice_name": "en-US-GuyNeural",
+  "caption": {
+    "words_per_chunk": 2,
+    "font": "Inter",
+    "size": 110,
+    "colors": [
+      "FFFFFF",
+      "FFE600",
+      "00F0FF"
+    ]
+  },
+  "scenes": [
+    {
+      "clip": "clips/lh_01.mp4",
+      "text": "Everyone in Brickport loved the old lighthouse.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_02.mp4",
+      "text": "But tonight, its great lamp would not turn on.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_03.mp4",
+      "text": "And a thick fog was rolling in.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_04.mp4",
+      "text": "Milo knew he had to help.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_05.mp4",
+      "text": "The glass lens was cracked. There was no time to fix it.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_06.mp4",
+      "text": "So he ran back down and asked everyone for their festival lanterns.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_07.mp4",
+      "text": "One lantern at a time, the lamp room began to glow.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_08.mp4",
+      "text": "And then... a beam of light cut through the fog.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_09.mp4",
+      "text": "The lost boats followed the light safely home.",
+      "duration": 4.5
+    },
+    {
+      "clip": "clips/lh_10.mp4",
+      "text": "Part 2? Comment a star.",
+      "duration": 4.5
+    }
+  ]
+}
