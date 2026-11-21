@@ -43,7 +43,11 @@ def make_tts(text, voice, dest):
         import edge_tts, asyncio
     except ImportError:
         sys.exit("--tts needs:  pip install edge-tts   (it also needs internet)")
-    asyncio.run(edge_tts.Communicate(text, voice).save(str(dest)))
+    try:
+        asyncio.run(edge_tts.Communicate(text, voice).save(str(dest)))
+    except Exception as e:
+        sys.exit(f"Voiceover failed ({type(e).__name__}). --tts needs an internet connection. "
+                 "Run without --tts, or record your own voice and set \"voice\" per scene.")
 
 
 def render_scene(scene, idx, dur, base, work):
