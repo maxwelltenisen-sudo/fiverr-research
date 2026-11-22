@@ -317,13 +317,14 @@ local function measureFeet(snap, t)
 end
 
 local lastPassTime = os.clock()
+local pendingMeasure = nil
 RunService:BindToRenderStep("ShowcasePose", Enum.RenderPriority.Camera.Value - 1, function(dt)
 	local dtSim = 0
 	if state.playing and state.inspect == 0 then
 		if state.hold > 0 then
 			state.hold = state.hold - dt
 		else
-			dtSim = dt * state.speed
+			dtSim = math.min(dt, 1 / 20) * state.speed    -- clamp so a hitch can't skip the animation
 			local prev = state.t
 			state.t = state.t + dtSim
 			if state.t >= Data.duration then
@@ -332,11 +333,13 @@ RunService:BindToRenderStep("ShowcasePose", Enum.RenderPriority.Camera.Value - 1
 			fireMarkers(prev, state.t)
 		end
 	end
+	-- the parts only show a pose one frame after it is applied, so measure the previous frame's pose against them
+	if pendingMeasure then measureFeet(pendingMeasure.snap, pendingMeasure.t); pendingMeasure = nil end
 	local snap = applyPose(state.t)
 	if state.t == 0 and not startSnapshot then passStartSnapshot(snap) end
 	updateScarf(snap.Blue.out, dtSim)
 	updateTrails()
-	if state.playing and state.inspect == 0 and state.pass == 1 then measureFeet(snap, state.t) end
+	if state.playing and state.inspect == 0 and state.pass == 1 then pendingMeasure = { snap = snap, t = state.t } end
 	if state.t >= Data.duration and state.hold <= 0 and state.playing and state.inspect == 0 then
 		if state.pass == 1 and not results.passDone then
 			results.passDone = true
