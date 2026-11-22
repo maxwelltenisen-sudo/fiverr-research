@@ -1,0 +1,29 @@
+{
+  "name": "Battlegrounds",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "BGEngine": { "$path": "BGEngine.lua" },
+      "BGConfig": { "$path": "BGConfig.lua" },
+      "BGClips": { "$path": "BGClips.lua" },
+      "BGCore": { "$path": "BGCore.lua" },
+      "BGCloth": { "$path": "BGCloth.lua" },
+      "BGRig": { "$path": "BGRig.lua" },
+      "BGCinematicData": { "$path": "BGCinematicData.lua" }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "BGBuilder": { "$path": "BGBuilder.server.lua" },
+      "BGServer": { "$path": "BGServer.server.lua" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "BGClient": { "$path": "BGClient.client.lua" },
+        "BGDirector": { "$path": "BGDirector.client.lua" }
+      }
+    }
+  }
+}
