@@ -22,7 +22,7 @@ local pb, pp, ob, op = at(4.0)
 local hand = ob.cf.RightHand.Position
 local E, W = op.piv.LeftElbow, op.piv.LeftWrist
 local dist = Engine.segmentDistance(hand, E, W)
-print(string.format("CLASH: blue hand centre (%.3f,%.3f,%.3f) to purple forearm axis = %.3f ; gap = %.3f (radius .62 + fist .3 = 0.92) ; hand-target miss=%.3f", hand.X,hand.Y,hand.Z, dist, dist-0.62-0.3, ob.miss.RightHand))
+print(string.format("CLASH: blue hand centre (%.3f,%.3f,%.3f) to purple forearm axis = %.3f ; gap = %.3f (radius .53 + fist .3 = 0.83) ; hand-target miss=%.3f", hand.X,hand.Y,hand.Z, dist, dist-0.53-0.3, ob.miss.RightHand))
 local body = (ob.cf.UpperTorso.Position - op.cf.UpperTorso.Position).Magnitude
 print(string.format("torso centre distance at clash = %.2f", body))
 -- counter contact

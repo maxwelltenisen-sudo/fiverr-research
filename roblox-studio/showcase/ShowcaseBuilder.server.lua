@@ -159,8 +159,7 @@ local function scarf(model, color, trim)
 	accessory(model, "UpperTorso", Vector3.new(1.9, 0.5, 1.3), CFrame.new(0, ut.Size.Y * 0.5 - 0.1, 0), color, Enum.Material.Fabric)
 end
 
-local function hair(model, color, count, height, lean)
-	local head = model:FindFirstChild("Head")
+local function hair(model, color, count, height, lean, brows)
 	for k = 1, count do
 		local a = (k / count) * math.pi * 2
 		accessory(model, "Head", Vector3.new(0.5, height, 0.5),
@@ -169,9 +168,11 @@ local function hair(model, color, count, height, lean)
 	accessory(model, "Head", Vector3.new(0.7, height * 1.25, 0.7), CFrame.new(0, 0.85, 0.05) * CFrame.Angles(-0.25, 0, 0), color)
 	accessory(model, "Head", Vector3.new(1.25, 0.4, 1.25), CFrame.new(0, 0.5, 0.02), color)
 	accessory(model, "Head", Vector3.new(1.0, 0.3, 0.3), CFrame.new(0, 0.34, -0.55), color)  -- fringe
-	local dark = Color3.fromRGB(10, 10, 14)
-	accessory(model, "Head", Vector3.new(0.3, 0.09, 0.05), CFrame.new(-0.27, 0.06, -0.62) * CFrame.Angles(0, 0, 0.35), dark)
-	accessory(model, "Head", Vector3.new(0.3, 0.09, 0.05), CFrame.new(0.27, 0.06, -0.62) * CFrame.Angles(0, 0, -0.35), dark)
+	if brows then
+		local dark = Color3.fromRGB(10, 10, 14)
+		accessory(model, "Head", Vector3.new(0.3, 0.09, 0.05), CFrame.new(-0.27, 0.16, -0.62) * CFrame.Angles(0, 0, 0.3), dark)
+		accessory(model, "Head", Vector3.new(0.3, 0.09, 0.05), CFrame.new(0.27, 0.16, -0.62) * CFrame.Angles(0, 0, -0.3), dark)
+	end
 end
 
 local function newRig(name, colors)
@@ -189,67 +190,81 @@ local function newRig(name, colors)
 	return m
 end
 
+-- BLUE = Satoru Gojo. Reference: tall lean build, snow-white spiky hair, black blindfold,
+-- dark navy high-collar zip jacket, slim black pants and boots, glowing blue Six Eyes.
 local function buildBlue()
-	local m = newRig("Blue", { skin = Color3.fromRGB(240, 205, 175), torso = Color3.fromRGB(28, 30, 44),
-		arm = Color3.fromRGB(34, 36, 52), leg = Color3.fromRGB(16, 17, 24) })
-	local dark, navy, black = Color3.fromRGB(22, 24, 36), Color3.fromRGB(30, 36, 62), Color3.fromRGB(10, 10, 14)
-	hair(m, black, 9, 1.2, 0.7)
-	scarf(m, Color3.fromRGB(14, 14, 22), BLUE)
-	-- layered outfit: jacket shell, lapels, hem, belt, shoulder pads, knee wraps
+	local m = newRig("Blue", { skin = Color3.fromRGB(246, 222, 200), torso = Color3.fromRGB(22, 28, 52),
+		arm = Color3.fromRGB(22, 28, 52), leg = Color3.fromRGB(14, 14, 20) })
+	m:SetAttribute("Character", "Gojo")
+	local navy, deep, black = Color3.fromRGB(24, 30, 58), Color3.fromRGB(16, 20, 40), Color3.fromRGB(10, 10, 14)
+	local white = Color3.fromRGB(248, 250, 255)
+	hair(m, white, 11, 1.3, 0.75, false)
+	-- black blindfold pushing the fringe up, with the Six Eyes glow along the lower edge
+	accessory(m, "Head", Vector3.new(1.3, 0.36, 1.3), CFrame.new(0, 0.1, 0), black, Enum.Material.Fabric)
+	accessory(m, "Head", Vector3.new(0.34, 0.05, 0.05), CFrame.new(-0.27, -0.1, -0.66), BLUE, Enum.Material.Neon)
+	accessory(m, "Head", Vector3.new(0.34, 0.05, 0.05), CFrame.new(0.27, -0.1, -0.66), BLUE, Enum.Material.Neon)
+	-- high wide collar and zip jacket
 	accessory(m, "UpperTorso", Vector3.new(2.15, 1.45, 1.12), CFrame.new(0, -0.05, 0.02), navy, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.45, 1.4, 0.16), CFrame.new(-0.35, 0, -0.6) * CFrame.Angles(0, 0, 0.12), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.45, 1.4, 0.16), CFrame.new(0.35, 0, -0.6) * CFrame.Angles(0, 0, -0.12), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.12, 1.35, 0.1), CFrame.new(0, 0, -0.64), BLUE, Enum.Material.Neon)
-	accessory(m, "LowerTorso", Vector3.new(2.15, 0.34, 1.12), CFrame.new(0, 0.05, 0), black)
-	accessory(m, "LowerTorso", Vector3.new(0.4, 0.22, 0.12), CFrame.new(0, 0.05, -0.58), BLUE, Enum.Material.Neon)
-	accessory(m, "LowerTorso", Vector3.new(1.9, 1.0, 0.14), CFrame.new(0, -0.45, 0.55) * CFrame.Angles(0.08, 0, 0), navy, Enum.Material.Fabric)
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.3, 0.4, 1.3), CFrame.new(0, 0.5, 0), black)
-		accessory(m, n, Vector3.new(1.1, 0.07, 1.1), CFrame.new(0, 0.05, 0), BLUE, Enum.Material.Neon)
-	end
-	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		accessory(m, n, Vector3.new(1.1, 0.07, 1.1), CFrame.new(0, -0.1, 0), BLUE, Enum.Material.Neon)
+	accessory(m, "UpperTorso", Vector3.new(2.05, 0.62, 1.3), CFrame.new(0, 0.82, 0.02), deep, Enum.Material.Fabric)
+	accessory(m, "UpperTorso", Vector3.new(0.09, 1.9, 0.1), CFrame.new(0, 0.1, -0.62), Color3.fromRGB(150, 155, 175), Enum.Material.Metal)   -- zip
+	accessory(m, "LowerTorso", Vector3.new(2.15, 0.45, 1.12), CFrame.new(0, 0.1, 0), navy, Enum.Material.Fabric)  -- jacket hem
+	accessory(m, "LowerTorso", Vector3.new(2.1, 0.2, 1.1), CFrame.new(0, -0.18, 0), black)                         -- belt
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do
+		accessory(m, n, Vector3.new(1.02, 1.15, 1.02), CFrame.new(0, 0, 0), black, Enum.Material.Fabric)
 	end
 	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do
-		accessory(m, n, Vector3.new(1.12, 0.35, 1.12), CFrame.new(0, 0.45, 0), black)
+		accessory(m, n, Vector3.new(1.02, 1.0, 1.02), CFrame.new(0, 0.05, 0), black, Enum.Material.Fabric)
 	end
-	accessory(m, "RightHand", Vector3.new(1.05, 0.5, 1.05), CFrame.new(0, 0, 0), black)
-	accessory(m, "LeftHand", Vector3.new(1.05, 0.5, 1.05), CFrame.new(0, 0, 0), black)
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do
+		accessory(m, n, Vector3.new(1.08, 0.7, 1.2), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather)
+	end
+	for _, n in ipairs({ "RightHand", "LeftHand" }) do
+		accessory(m, n, Vector3.new(1.0, 0.45, 1.0), CFrame.new(0, 0.15, 0), Color3.fromRGB(246, 222, 200))
+	end
+	-- cloth tail trailing from the collar: gives the scarf-lag cue without a costume gag
+	scarf(m, Color3.fromRGB(14, 16, 30), BLUE)
 	addTrail(m, "RightHand", BLUE); addTrail(m, "LeftHand", BLUE)
 	return m
 end
 
+-- PURPLE = Toji Fushiguro. Reference: heavily muscled, short messy black hair, scar at the
+-- corner of the mouth, tight half-sleeve dark shirt, black pants, bare forearms, cursed tool on the hip.
 local function buildPurple()
-	local m = newRig("Purple", { skin = Color3.fromRGB(245, 215, 190), torso = Color3.fromRGB(30, 26, 46),
-		arm = Color3.fromRGB(32, 28, 50), leg = Color3.fromRGB(18, 16, 28) })
-	local dark, plum, black = Color3.fromRGB(24, 20, 38), Color3.fromRGB(44, 34, 70), Color3.fromRGB(10, 9, 16)
-	local silver = Color3.fromRGB(205, 208, 226)
-	hair(m, silver, 9, 1.05, 0.6)
-	-- dark high-collar outfit
-	accessory(m, "UpperTorso", Vector3.new(2.12, 1.5, 1.1), CFrame.new(0, -0.05, 0.02), plum, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(2.0, 1.1, 0.22), CFrame.new(0, 1.0, 0.62) * CFrame.Angles(-0.12, 0, 0), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.22, 1.0, 1.15), CFrame.new(-0.95, 0.95, 0.02), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.22, 1.0, 1.15), CFrame.new(0.95, 0.95, 0.02), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(1.9, 0.5, 0.2), CFrame.new(0, 0.85, -0.55), dark, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(0.1, 1.2, 0.1), CFrame.new(0, -0.05, -0.62), VIOLET, Enum.Material.Neon)
-	accessory(m, "LowerTorso", Vector3.new(2.15, 0.34, 1.12), CFrame.new(0, 0.05, 0), black)
-	accessory(m, "LowerTorso", Vector3.new(0.4, 0.2, 0.12), CFrame.new(0, 0.05, -0.58), VIOLET, Enum.Material.Neon)
+	local skin = Color3.fromRGB(228, 186, 160)
+	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(26, 30, 34),
+		arm = skin, leg = Color3.fromRGB(16, 16, 20) })
+	m:SetAttribute("Character", "Toji")
+	local shirt, black = Color3.fromRGB(26, 30, 36), Color3.fromRGB(12, 12, 16)
+	hair(m, Color3.fromRGB(14, 12, 14), 8, 0.5, 0.35, true)
+	-- scar at the right corner of the mouth
+	accessory(m, "Head", Vector3.new(0.07, 0.24, 0.04), CFrame.new(0.2, -0.3, -0.62) * CFrame.Angles(0, 0, 0.35), Color3.fromRGB(170, 95, 95))
+	-- tight half-sleeve shirt stretched over a broad chest and shoulders
+	accessory(m, "UpperTorso", Vector3.new(2.3, 1.5, 1.18), CFrame.new(0, -0.05, 0.02), shirt, Enum.Material.Fabric)
+	accessory(m, "UpperTorso", Vector3.new(2.34, 0.5, 1.22), CFrame.new(0, 0.32, -0.02), Color3.fromRGB(32, 37, 44), Enum.Material.Fabric)  -- chest
+	accessory(m, "UpperTorso", Vector3.new(1.0, 0.3, 0.9), CFrame.new(0, 0.85, 0), skin)                                                    -- neck
+	accessory(m, "LowerTorso", Vector3.new(2.1, 0.5, 1.1), CFrame.new(0, 0.05, 0), shirt, Enum.Material.Fabric)
+	accessory(m, "LowerTorso", Vector3.new(2.1, 0.18, 1.12), CFrame.new(0, -0.15, 0), black, Enum.Material.Leather)                        -- belt
 	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.3, 0.4, 1.3), CFrame.new(0, 0.5, 0), black)
-		accessory(m, n, Vector3.new(1.1, 0.07, 1.1), CFrame.new(0, 0.05, 0), VIOLET, Enum.Material.Neon)
+		accessory(m, n, Vector3.new(1.28, 0.9, 1.28), CFrame.new(0, 0.2, 0), shirt, Enum.Material.Fabric)                                   -- half sleeve
+		accessory(m, n, Vector3.new(1.12, 0.5, 1.12), CFrame.new(0, -0.3, 0), skin)                                                         -- bicep bulk
 	end
-	-- reinforced forearms (guard radius comes from the shared data so contact math matches the geometry)
-	local gw = Data.contacts[1].guardRadius * 2
 	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		local la = m:FindFirstChild(n)
-		local g = accessory(m, n, Vector3.new(gw, la.Size.Y * 0.85, gw), CFrame.new(0, 0, 0), black, Enum.Material.Metal)
-		g.Name = (n == "LeftLowerArm") and "GuardL" or "GuardR"
-		accessory(m, n, Vector3.new(gw + 0.04, 0.09, gw + 0.04), CFrame.new(0, la.Size.Y * 0.3, 0), VIOLET, Enum.Material.Neon)
-		accessory(m, n, Vector3.new(gw + 0.04, 0.09, gw + 0.04), CFrame.new(0, -la.Size.Y * 0.3, 0), VIOLET, Enum.Material.Neon)
+		accessory(m, n, Vector3.new(1.06, 0.34, 1.06), CFrame.new(0, 0.1, 0), skin)                                                         -- forearm bulk
+		accessory(m, n, Vector3.new(1.08, 0.18, 1.08), CFrame.new(0, -0.35, 0), black, Enum.Material.Fabric)                                -- wrist strap
+	end
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do
+		accessory(m, n, Vector3.new(1.15, 1.15, 1.15), CFrame.new(0, 0, 0), black, Enum.Material.Fabric)
 	end
 	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do
-		accessory(m, n, Vector3.new(1.12, 0.35, 1.12), CFrame.new(0, 0.45, 0), black)
+		accessory(m, n, Vector3.new(1.08, 1.0, 1.08), CFrame.new(0, 0.05, 0), black, Enum.Material.Fabric)
 	end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do
+		accessory(m, n, Vector3.new(1.1, 0.7, 1.25), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather)
+	end
+	-- Inverted Spear of Heaven worn on the back of the belt: black grip with a ring, short jitte-like blade
+	accessory(m, "LowerTorso", Vector3.new(0.18, 0.7, 0.18), CFrame.new(0.55, 0.15, 0.6) * CFrame.Angles(0, 0, 0.5), black, Enum.Material.Leather)
+	accessory(m, "LowerTorso", Vector3.new(0.22, 0.22, 0.05), CFrame.new(0.78, -0.2, 0.62), Color3.fromRGB(190, 190, 200), Enum.Material.Metal)
+	accessory(m, "LowerTorso", Vector3.new(0.1, 0.9, 0.12), CFrame.new(0.2, 0.65, 0.6) * CFrame.Angles(0, 0, 0.5), Color3.fromRGB(190, 195, 205), Enum.Material.Metal)
 	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
 	return m
 end

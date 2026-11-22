@@ -98,7 +98,7 @@ D.fighters = {
 -- "chest": the attacker's fist lands on the defender's upper torso front.
 D.contacts = {
 	{ id = "clash", kind = "guard", t = 4.0, attacker = "Blue", hand = "R", defender = "Purple", arm = "L",
-		guardRadius = 0.62, fist = 0.3, reach = 0.52 },
+		guardRadius = 0.53, fist = 0.3, reach = 0.52 },
 	{ id = "counter", kind = "chest", t = 5.15, attacker = "Purple", hand = "R", defender = "Blue",
 		surface = 0.45, up = 0.35 },
 }
