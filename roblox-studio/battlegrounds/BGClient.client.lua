@@ -18,6 +18,7 @@ local Config = require(ReplicatedStorage:WaitForChild("BGConfig"))
 local Clips = require(ReplicatedStorage:WaitForChild("BGClips"))
 local Rig = require(ReplicatedStorage:WaitForChild("BGRig"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
+local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
@@ -157,6 +158,16 @@ local function ghost(model, color)
 end
 
 local shakeUntil, shakePower = 0, 0
+local closeShot, camRoll, fovKick = nil, 0, 0     -- close-ups on big hits, a small tilt and a FOV punch
+local function closeUp(pos, attId, dur)
+	local fwd = Vector3.new(math.cos(rs[attId].ang), 0, math.sin(rs[attId].ang))
+	local right = Vector3.new(-fwd.Z, 0, fwd.X)
+	closeShot = { cf = CFrame.lookAt(pos + right * 3.4 + Vector3.new(0, 0.8, 0), pos), fov = 30, untilT = os.clock() + (dur or 0.32) }
+	camRoll = (math.random() < 0.5 and -1 or 1) * 4
+end
+local function topDown(pos, dur)
+	closeShot = { cf = CFrame.lookAt(pos + Vector3.new(0.5, 10, 2.5), pos), fov = 46, untilT = os.clock() + (dur or 0.55) }
+end
 local function shake(power, dur) shakePower, shakeUntil = power, os.clock() + dur end
 
 local function partPos(id, name)
@@ -332,7 +343,7 @@ local function onEvent(e)
 		if n == "afterimage" then ghost(rs[id].model, CYAN)
 		elseif n == "windup_charge" then sparks(hand, colorOf(id), 0.5, 10)
 		elseif n == "pulse_gather" then pulseBall(chestPos(id), colorOf(id), 5, 0.6, 0.3, 0.7)
-		elseif n == "pulse_chest" then pulseBall(chestPos(id), colorOf(id), 1, 7, 0.35, 0.5); shake(0.15, 0.25)
+		elseif n == "pulse_chest" then pulseBall(chestPos(id), colorOf(id), 1, 7, 0.35, 0.5); shake(0.15, 0.25); Style.flash(colorOf(id), 0.12, 0.3); Style.ringSlash(chestPos(id), colorOf(id), 6, 90, 0.3, 0)
 		elseif n == "pulse_forearms" then
 			pulseBall(chestPos(id), colorOf(id), 1, 6, 0.35, 0.5)
 			for _, h in ipairs({ "RightLowerArm", "LeftLowerArm" }) do local p = partPos(id, h); if p then pulseBall(p, colorOf(id), 0.5, 3, 0.3, 0.4) end end
@@ -348,13 +359,19 @@ local function onEvent(e)
 			local form = rs[id].form
 			local d = big and (Config.horizon.radius * 2) or ((form == "Base") and Config.hits.ren_pulse.range * 2 or Config.hits.ren_pulse.range1 * 2)
 			groundRing(Vector3.new(e.x, 0, e.z), colorOf(id), 1.5, d, big and 0.45 or 0.3)
+			Style.crack(Vector3.new(e.x, 0, e.z), colorOf(id), big and 18 or 10, big and 12 or d / 2)
+			if big then Style.speedLines(colorOf(id), 0.3, 30); Style.flash(Color3.new(1, 1, 1), 0.1, 0.5) end
 			shake(big and 0.5 or 0.25, 0.3)
 		end
 	elseif e.type == "hit" then
 		local pos = contactPos(e.by, e.f)
 		local size = math.clamp(0.5 + e.dmg / 16, 0.5, 1.4)
-		sparks(pos, e.armor and Color3.fromRGB(225, 225, 235) or colorOf(e.by), size, nil)
-		if e.final or e.dmg >= 10 then shake(0.3, 0.2) elseif e.dmg >= 5 then shake(0.1, 0.12) end
+		local col = e.armor and Color3.fromRGB(225, 225, 235) or colorOf(e.by)
+		sparks(pos, col, size * 0.5, nil)
+		local big = e.final or e.dmg >= 10
+		if big then Style.impact(pos, col, 1.5); closeUp(pos, e.by); fovKick = 7; shake(0.3, 0.2)
+		elseif e.dmg >= 5 then Style.impact(pos, col, 0.6); fovKick = math.max(fovKick, 3); shake(0.1, 0.12)
+		else Style.shards(pos, col, 6, 7) end
 	elseif e.type == "block" then
 		sparks(contactPos(e.by, e.f), Color3.fromRGB(235, 235, 255), 0.5, nil)
 		local kid = e.f
@@ -369,6 +386,8 @@ local function onEvent(e)
 	elseif e.type == "timed" then
 		ripple(chestPos(e.f), forward(e.f), VIOLET)
 		sparks(contactPos(e.by, e.f), VIOLET, 1.0, nil)
+		Style.ringSlash(chestPos(e.f) + forward(e.f) * 1.2, VIOLET, 6, 90, 0.3, 0)
+		Style.flash(Color3.new(1, 1, 1), 0.06, 0.3)
 		for _, p in ipairs(rs[e.f].deco.Seam) do
 			p.Transparency = 0.05
 			if rs[e.f].form == "Base" then TweenService:Create(p, TweenInfo.new(0.6), { Transparency = 1 }):Play() end
@@ -381,10 +400,12 @@ local function onEvent(e)
 	elseif e.type == "slam" then
 		if e.big then
 			groundRing(Vector3.new(e.x, 0, e.z), CYAN, 1.5, 22, 0.5)      -- the single expanding Thunderfall ring
+			Style.ink(0.45); Style.crack(Vector3.new(e.x, 0, e.z), CYAN, 16, 12); topDown(Vector3.new(e.x, 1, e.z), 0.55)
 			sparks(Vector3.new(e.x, 1, e.z), Color3.fromRGB(220, 240, 255), 1.4, 30)
 			shake(0.7, 0.4)
 		else
 			groundRing(Vector3.new(e.x, 0, e.z), BLUE, 1, 6, 0.25)         -- compact follow-up impact
+			Style.shards(Vector3.new(e.x, 0.6, e.z), BLUE, 10, 8, Vector3.new(0, 1, 0)); Style.crack(Vector3.new(e.x, 0, e.z), BLUE, 7, 4)
 			sparks(Vector3.new(e.x, 0.8, e.z), BLUE, 0.9, nil)
 			shake(0.25, 0.2)
 		end
@@ -543,12 +564,15 @@ RunService:BindToRenderStep("BGCamera", Enum.RenderPriority.Camera.Value + 1, fu
 	local back = 8.5 + math.min(gap, 14) * 0.35
 	local pos = Vector3.new(me.x, 0, me.z) - dir * back + right * 2.6 + Vector3.new(0, 5.2 + math.min(gap, 14) * 0.1, 0)
 	local target = CFrame.lookAt(pos, mid)
-	local fov = 52
-	if not camCF then camCF, camFov = target, fov end
+	local fov = 52 - fovKick
+	fovKick *= math.exp(-dt * 7)
 	local a = 1 - math.exp(-dt * 8)
+	if closeShot and os.clock() < closeShot.untilT then target, fov, a = closeShot.cf, closeShot.fov, 1 - math.exp(-dt * 22) end
+	if not camCF then camCF, camFov = target, fov end
 	camCF = camCF:Lerp(target, a)
 	camFov += (fov - camFov) * a
-	local cf = camCF
+	camRoll *= math.exp(-dt * 6)
+	local cf = camCF * CFrame.Angles(0, 0, math.rad(camRoll))
 	if os.clock() < shakeUntil then
 		local s = shakePower
 		cf = cf * CFrame.new((math.random() - 0.5) * s, (math.random() - 0.5) * s, 0)
@@ -764,6 +788,7 @@ end)
 stage:GetAttributeChangedSignal("Mode"):Connect(function()
 	if playing() then
 		held.W, held.A, held.S, held.D = false, false, false, false
+		Style.setEnabled(true)
 	end
 end)
 print("[BG] client ready. Tab = playable / cinematic. In Studio: use the left panel to pick the fighter, dummy mode and form.")

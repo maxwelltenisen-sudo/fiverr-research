@@ -11,9 +11,9 @@ power forms and ultimates, and an 8-12 s cinematic replay of the fist-to-forearm
 1. Open your place. Stop any running Play session.
 2. **Easiest:** the Roblox Studio connector in your local Claude Code can install it for you. In the repo folder run `claude` and say:
    *"Install roblox-studio/battlegrounds into my open Studio place from the source files (see README), press Play, read the Output and fix errors."*
-   **Or paste:** copy all of `Install_Battlegrounds.lua`, paste it into **View > Command Bar** (or the Output window's command line), press Enter. It prints `created ...` 11 times.
+   **Or paste:** copy all of `Install_Battlegrounds.lua`, paste it into **View > Command Bar** (or the Output window's command line), press Enter. It prints `created ...` 12 times.
    **Or Rojo:** `rojo serve` in this folder (uses `default.project.json`).
-   **Or by hand:** create the 11 scripts in the table below and paste each file.
+   **Or by hand:** create the 12 scripts in the table below and paste each file.
 3. **Test > Play** (not Run). The cinematic replay starts: pass 1 with VFX off, pass 2 with VFX on, then it loops.
 4. Press **Tab** (or the *Playable* button) to fight. The left panel picks the fighter (Kael / Ren), dummy behaviour (Idle / Guard / Attack) and, in Studio only, jumps to Base / First form / Final form.
 
@@ -25,6 +25,7 @@ power forms and ultimates, and an 8-12 s cinematic replay of the fist-to-forearm
 | ReplicatedStorage | ModuleScript | BGCore | BGCore.lua (server rules, no instances) |
 | ReplicatedStorage | ModuleScript | BGCloth | BGCloth.lua (scarf / coat lag) |
 | ReplicatedStorage | ModuleScript | BGRig | BGRig.lua (reads R15 joints) |
+| ReplicatedStorage | ModuleScript | BGStyle | BGStyle.lua (shards, ring slashes, floor cracks, speed lines, flashes, ink frame) |
 | ReplicatedStorage | ModuleScript | BGCinematicData | BGCinematicData.lua (EDITABLE cinematic keyframes, contacts, cameras, markers) |
 | ServerScriptService | Script | BGBuilder | BGBuilder.server.lua (arena + the two rigs and costumes) |
 | ServerScriptService | Script | BGServer | BGServer.server.lua (runs BGCore, validates input) |
@@ -36,6 +37,12 @@ Older story/showcase Scripts and LocalScripts are disabled by the installer, not
 ## Controls
 Playable: **WASD** move (W = toward the opponent) | **LMB** combo | **Q E R C** skills | **hold F** guard | **G** counter / riposte | **X** first form (50%) | **Z** final form (100%) | **T** ultimate | **Tab** playable <-> cinematic.
 Cinematic: **R** replay | **B** slow motion | **V** VFX on/off | **Space** pause | **, .** step | **C** contact inspector (side camera, then top camera, prints the measured gap). The same buttons are in the left panel.
+
+## Visual style (reference: anime-cinematic VFX reel)
+Blue and violet stay the only colours on a high-contrast, desaturated, dark glossy arena with a dark vignette and drifting motes.
+Effects are shaped, short and tied to the action: sharp shards and crossing ring slashes with a white flash on hard hits, radiating speed lines,
+cracked-glass lines racing over the floor on slams, a white "ink" frame with black speed lines on Thunderfall, close-up and top-down camera cuts with a FOV punch and tilt on big hits.
+Ren has two long cloth hair tails. All of it lives in `BGStyle.lua` (+ the event handlers in `BGClient`); in the cinematic it only fires when VFX is on, so the VFX-off review stays clean.
 
 ## Moves
 | | Kael | Ren |

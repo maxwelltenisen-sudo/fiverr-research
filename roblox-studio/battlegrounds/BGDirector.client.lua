@@ -14,6 +14,7 @@ local Workspace = game:GetService("Workspace")
 local Engine = require(ReplicatedStorage:WaitForChild("BGEngine"))
 local Data = require(ReplicatedStorage:WaitForChild("BGCinematicData"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
+local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
@@ -151,6 +152,7 @@ local function fireMarkers(prevT, t)
 					if b.marker == mk.name then
 						local c = info[b.contact]
 						burst(c.C, b.color, b.size, c.n or Vector3.new(1, 0, 0))
+						Style.impact(c.C, b.color, b.size >= 1 and 1.5 or 0.7)
 					end
 				end
 			end
@@ -306,6 +308,7 @@ RunService:BindToRenderStep("ShowcasePose", Enum.RenderPriority.Camera.Value - 1
 	end
 	-- the parts only show a pose one frame after it is applied, so measure the previous frame's pose against them
 	if pendingMeasure then measureFeet(pendingMeasure.snap, pendingMeasure.t); pendingMeasure = nil end
+	Style.setEnabled(state.vfx)
 	local snap = applyPose(state.t)
 	if state.t == 0 and not startSnapshot then passStartSnapshot(snap) end
 	clothB:update(snap.Blue.out.cf.UpperTorso, dtSim)

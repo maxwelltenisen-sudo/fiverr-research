@@ -10,6 +10,7 @@
       "BGCore": { "$path": "BGCore.lua" },
       "BGCloth": { "$path": "BGCloth.lua" },
       "BGRig": { "$path": "BGRig.lua" },
+      "BGStyle": { "$path": "BGStyle.lua" },
       "BGCinematicData": { "$path": "BGCinematicData.lua" }
     },
     "ServerScriptService": {

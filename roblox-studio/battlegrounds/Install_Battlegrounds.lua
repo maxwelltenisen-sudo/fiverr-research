@@ -1,6 +1,6 @@
 -- ONE-PASTE INSTALLER: Kael vs Ren battlegrounds showcase.
 -- Paste this whole file into Roblox Studio's Command Bar (View > Command Bar) or the Output window's command line, press Enter.
--- Creates 7 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
+-- Creates 8 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
 -- Your older story / showcase scripts are DISABLED, not deleted (re-enable them in Properties if you want them back).
 local RS = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
@@ -1692,6 +1692,192 @@ end
 
 return Rig
 ]====])
+put(RS, "ModuleScript", "BGStyle", [====[
+-- BGStyle (ModuleScript, ReplicatedStorage, client only): the anime-cinematic effect layer.
+-- Palette stays electric blue vs violet on black / white / grey. Effects are SHAPED (shards, ring slashes, floor cracks,
+-- speed lines, white impact flashes) instead of round sparks, and each one is short and tied to the action that fired it.
+-- Every function is safe to call with effects off: pass nothing, or set Style.enabled = false.
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+local Workspace = game:GetService("Workspace")
+
+local Style = { enabled = true }
+local fx, gui, flash, ink, lines, vignette = nil, nil, nil, nil, {}, {}
+local rng = Random.new(5)
+
+local function ensure()
+	if gui then return end
+	fx = Workspace:FindFirstChild("BGStyleFX") or Instance.new("Folder")
+	fx.Name = "BGStyleFX"
+	fx.Parent = Workspace
+	gui = Instance.new("ScreenGui")
+	gui.Name = "BGStyleOverlay"
+	gui.IgnoreGuiInset, gui.ResetOnSpawn, gui.DisplayOrder = true, false, 50
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	-- soft dark vignette made of four gradient bars
+	for i, spec in ipairs({
+		{ UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0.18, 0), 90 }, { UDim2.new(0, 0, 0.82, 0), UDim2.new(1, 0, 0.18, 0), 270 },
+		{ UDim2.new(0, 0, 0, 0), UDim2.new(0.12, 0, 1, 0), 0 }, { UDim2.new(0.88, 0, 0, 0), UDim2.new(0.12, 0, 1, 0), 180 } }) do
+		local f = Instance.new("Frame")
+		f.Position, f.Size, f.BorderSizePixel = spec[1], spec[2], 0
+		f.BackgroundColor3 = Color3.new(0, 0, 0)
+		f.BackgroundTransparency = 0
+		local g = Instance.new("UIGradient")
+		g.Rotation = spec[3]
+		g.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+		g.Parent = f
+		f.Parent = gui
+		vignette[i] = f
+	end
+	flash = Instance.new("Frame")
+	flash.Size, flash.BorderSizePixel, flash.BackgroundColor3, flash.BackgroundTransparency, flash.ZIndex = UDim2.new(1, 0, 1, 0), 0, Color3.new(1, 1, 1), 1, 20
+	flash.Parent = gui
+	ink = Instance.new("Frame")
+	ink.Size, ink.BorderSizePixel, ink.BackgroundColor3, ink.BackgroundTransparency, ink.ZIndex = UDim2.new(1, 0, 1, 0), 0, Color3.new(1, 1, 1), 1, 18
+	ink.Parent = gui
+	for i = 1, 40 do
+		local l = Instance.new("Frame")
+		l.AnchorPoint = Vector2.new(0, 0.5)
+		l.Position = UDim2.new(0.5, 0, 0.5, 0)
+		l.BorderSizePixel = 0
+		l.BackgroundTransparency = 1
+		l.ZIndex = 19
+		local g = Instance.new("UIGradient")        -- only the middle band of each line shows: streaks radiate from the centre
+		g.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.35, 1), NumberSequenceKeypoint.new(0.6, 0),
+			NumberSequenceKeypoint.new(0.85, 0.3), NumberSequenceKeypoint.new(1, 1) })
+		g.Parent = l
+		l.Parent = gui
+		lines[i] = l
+	end
+end
+
+function Style.setEnabled(on)
+	Style.enabled = on
+	ensure()
+	for _, f in ipairs(vignette) do f.Visible = on end
+end
+
+-- full-screen white (or coloured) flash, e.g. 0.05 s on every hard hit
+function Style.flash(color, dur, strength)
+	if not Style.enabled then return end
+	ensure()
+	flash.BackgroundColor3 = color or Color3.new(1, 1, 1)
+	flash.BackgroundTransparency = 1 - (strength or 0.5)
+	TweenService:Create(flash, TweenInfo.new(dur or 0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+end
+
+-- radiating speed lines (colour = accent, or black on the ink flash)
+function Style.speedLines(color, dur, count)
+	if not Style.enabled then return end
+	ensure()
+	dur = dur or 0.25
+	for i = 1, math.min(count or 28, #lines) do
+		local l = lines[i]
+		l.Rotation = (i / (count or 28)) * 360 + rng:NextNumber(-5, 5)
+		l.Size = UDim2.new(rng:NextNumber(0.55, 0.95), 0, 0, rng:NextInteger(2, 6))
+		l.BackgroundColor3 = color
+		l.BackgroundTransparency = 0.15
+		TweenService:Create(l, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1, Size = UDim2.new(1.1, 0, 0, 1) }):Play()
+	end
+end
+
+-- the finishing "ink" frame: a white flash with black speed lines (big slams and ultimates)
+function Style.ink(dur)
+	if not Style.enabled then return end
+	ensure()
+	dur = dur or 0.4
+	ink.BackgroundTransparency = 0.05
+	TweenService:Create(ink, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 1 }):Play()
+	Style.speedLines(Color3.new(0, 0, 0), dur * 0.9, 36)
+end
+
+local function neon(size, cframe, color, transparency)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+	p.Material, p.Color, p.Transparency = Enum.Material.Neon, color, transparency or 0
+	p.Size, p.CFrame = size, cframe
+	p.Parent = fx
+	return p
+end
+
+-- sharp shards flying out of a point (replaces round sparks on hits)
+function Style.shards(pos, color, count, speed, axis)
+	if not Style.enabled then return end
+	ensure()
+	speed = speed or 9
+	for i = 1, count or 10 do
+		local dir = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(-0.3, 1), rng:NextNumber(-1, 1))
+		if axis then dir = (dir + axis * 1.2) end
+		dir = dir.Magnitude > 0.01 and dir.Unit or Vector3.new(0, 1, 0)
+		local len = rng:NextNumber(0.5, 1.3)
+		local p = neon(Vector3.new(0.07, 0.07, len), CFrame.lookAt(pos, pos + dir), (i % 3 == 0) and Color3.new(1, 1, 1) or color)
+		local dist = rng:NextNumber(0.6, 1.0) * speed * 0.35
+		TweenService:Create(p, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ CFrame = CFrame.lookAt(pos + dir * dist, pos + dir * (dist + 1)), Size = Vector3.new(0.02, 0.02, len * 0.3), Transparency = 1 }):Play()
+		Debris:AddItem(p, 0.4)
+	end
+end
+
+-- thin expanding ring slash; tilt = degrees of roll so rings can cross each other
+function Style.ringSlash(pos, color, diameter, tilt, dur, axisYaw)
+	if not Style.enabled then return end
+	ensure()
+	local ring = Instance.new("Part")
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Anchored, ring.CanCollide, ring.CanQuery, ring.CastShadow = true, false, false, false
+	ring.Material, ring.Color, ring.Transparency = Enum.Material.Neon, color, 0.05
+	ring.Size = Vector3.new(0.05, 0.6, 0.6)
+	ring.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(axisYaw or 0), math.rad(tilt or 90))
+	ring.Parent = fx
+	TweenService:Create(ring, TweenInfo.new(dur or 0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Size = Vector3.new(0.05, diameter, diameter), Transparency = 1 }):Play()
+	Debris:AddItem(ring, (dur or 0.28) + 0.1)
+end
+
+-- cracked-glass lines racing across the floor from a point
+function Style.crack(center, color, count, length)
+	if not Style.enabled then return end
+	ensure()
+	for i = 1, count or 10 do
+		local a = (i / (count or 10)) * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+		local len = length * rng:NextNumber(0.55, 1.0)
+		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		local p = neon(Vector3.new(0.14, 0.05, 0.2), CFrame.lookAt(Vector3.new(center.X, 0.13, center.Z), Vector3.new(center.X, 0.13, center.Z) + dir), color, 0.05)
+		TweenService:Create(p, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ Size = Vector3.new(0.14, 0.05, len), CFrame = CFrame.lookAt(Vector3.new(center.X, 0.13, center.Z) + dir * len / 2, Vector3.new(center.X, 0.13, center.Z) + dir * (len / 2 + 1)) }):Play()
+		task.delay(0.5, function() if p.Parent then TweenService:Create(p, TweenInfo.new(0.6), { Transparency = 1 }):Play() end end)
+		Debris:AddItem(p, 1.2)
+		if rng:NextNumber() < 0.6 then            -- a short branch off the main crack
+			local b = a + rng:NextNumber(-0.6, 0.6)
+			local bd = Vector3.new(math.cos(b), 0, math.sin(b))
+			local start = Vector3.new(center.X, 0.13, center.Z) + dir * len * 0.6
+			local bl = len * 0.35
+			local q = neon(Vector3.new(0.1, 0.05, 0.1), CFrame.lookAt(start, start + bd), color, 0.1)
+			TweenService:Create(q, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ Size = Vector3.new(0.1, 0.05, bl), CFrame = CFrame.lookAt(start + bd * bl / 2, start + bd * (bl / 2 + 1)) }):Play()
+			task.delay(0.5, function() if q.Parent then TweenService:Create(q, TweenInfo.new(0.6), { Transparency = 1 }):Play() end end)
+			Debris:AddItem(q, 1.2)
+		end
+	end
+end
+
+-- one call for a hard hit: shards + crossing ring slashes + white flash (+ lines/cracks when it is big)
+function Style.impact(pos, color, power)
+	if not Style.enabled then return end
+	power = power or 1
+	Style.shards(pos, color, math.floor(8 + 6 * power), 8 + 4 * power)
+	Style.ringSlash(pos, Color3.new(1, 1, 1), 2.5 + 2.5 * power, 90, 0.18, 0)
+	Style.ringSlash(pos, color, 3.5 + 3 * power, 60, 0.26, 40)
+	Style.flash(Color3.new(1, 1, 1), 0.07, 0.25 + 0.2 * power)
+	if power >= 1.3 then
+		Style.speedLines(color, 0.22, 26)
+		Style.crack(pos, color, 10, 5 + 2 * power)
+	end
+end
+
+return Style
+]====])
 put(RS, "ModuleScript", "BGCinematicData", [====[
 -- BGCinematicData (ModuleScript, ReplicatedStorage): THE EDITABLE ANIMATION SOURCE.
 -- Times are seconds. Keys inherit everything from the previous key; list only what changes.
@@ -1913,10 +2099,10 @@ end
 
 ---------------------------------------------------------------- stage: moonlit stone arena
 Lighting.ClockTime = 0
-Lighting.Brightness = 2
-Lighting.ExposureCompensation = 0.55
-Lighting.Ambient = Color3.fromRGB(80, 85, 130)
-Lighting.OutdoorAmbient = Color3.fromRGB(95, 100, 150)
+Lighting.Brightness = 1.7
+Lighting.ExposureCompensation = 0.45
+Lighting.Ambient = Color3.fromRGB(62, 66, 105)
+Lighting.OutdoorAmbient = Color3.fromRGB(78, 82, 125)
 
 local function fx(inst)
 	inst:SetAttribute("ShowcaseFX", true)
@@ -1927,19 +2113,22 @@ local atmo = Instance.new("Atmosphere")
 atmo.Density = 0.28; atmo.Offset = 0.2; atmo.Color = Color3.fromRGB(100, 110, 175); atmo.Decay = Color3.fromRGB(40, 45, 90)
 fx(atmo)
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.6; bloom.Size = 22; bloom.Threshold = 0.95
+bloom.Intensity = 0.9; bloom.Size = 26; bloom.Threshold = 0.9
 fx(bloom)
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.12; cc.Saturation = 0.1; cc.TintColor = Color3.fromRGB(225, 225, 255)
+cc.Contrast = 0.28; cc.Saturation = -0.2; cc.TintColor = Color3.fromRGB(225, 228, 255)   -- high contrast, desaturated world: blue and violet are the only colours
 fx(cc)
+local dof = Instance.new("DepthOfFieldEffect")
+dof.FarIntensity = 0.12; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28
+fx(dof)
 
 local R = Config.arena.radius
-local STONE, STONE2, STONE3 = Color3.fromRGB(78, 82, 100), Color3.fromRGB(58, 62, 80), Color3.fromRGB(96, 100, 122)
+local STONE, STONE2, STONE3 = Color3.fromRGB(58, 60, 74), Color3.fromRGB(40, 42, 56), Color3.fromRGB(78, 80, 98)
 part({ Name = "Ground", Size = Vector3.new(500, 1, 500), Position = Vector3.new(0, -0.5, 0), Color = Color3.fromRGB(28, 30, 42),
 	Material = Enum.Material.Slate, CanCollide = true })
 -- raised stone disc
 part({ Name = "ArenaFloor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, (R + 3) * 2, (R + 3) * 2),
-	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE, Material = Enum.Material.Cobblestone, CanCollide = true })
+	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(30, 32, 44), Material = Enum.Material.Slate, Reflectance = 0.3, CanCollide = true })   -- dark glossy floor
 part({ Size = Vector3.new(0.1, (R + 3.4) * 2, (R + 3.4) * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, -0.02, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE3, Material = Enum.Material.Slate })
 part({ Size = Vector3.new(0.12, R * 2, R * 2), Shape = Enum.PartType.Cylinder,
@@ -1983,6 +2172,17 @@ for _, spec in ipairs({ { Vector3.new(-10, 12, 10), Color3.fromRGB(110, 170, 255
 	local l = Instance.new("PointLight")
 	l.Color = spec[2]; l.Range = 48; l.Brightness = spec[3]
 	l.Parent = lp
+end
+-- drifting motes (blue and violet) over the arena: a quiet particle layer that is always present
+for i, col in ipairs({ BLUE, VIOLET }) do
+	local mp = part({ Name = "Motes" .. i, Size = Vector3.new(34, 1, 34), Position = Vector3.new(0, 14, 0), Transparency = 1 })
+	local pe = Instance.new("ParticleEmitter")
+	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	pe.Color = ColorSequence.new(col); pe.LightEmission = 1; pe.Rate = 7
+	pe.Lifetime = NumberRange.new(7, 10); pe.Speed = NumberRange.new(0.4, 1.2)
+	pe.EmissionDirection = Enum.NormalId.Bottom; pe.SpreadAngle = Vector2.new(20, 20)
+	pe.Size = NumberSequence.new(0.16, 0.1); pe.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	pe.Parent = mp
 end
 local focus = part({ Name = "FocusPoint", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 4, 0), Transparency = 1 })
 local function setFocus(plr) pcall(function() plr.ReplicationFocus = focus end) end
@@ -2200,6 +2400,13 @@ local function buildRen()
 	for k, x in ipairs({ -0.52, 0.52 }) do
 		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.95, 0.75, 0.14), coat, VIOLET)
 	end
+	-- two long hair tails from the back of the head: cloth chains that swing with the body
+	for k, x in ipairs({ -0.3, 0.3 }) do
+		cloth(m, "Head", "HT" .. k, CFrame.new(x, 0.15, 0.6), 3, Vector3.new(0.42, 1.0, 0.14), hairC)
+	end
+	for _, c in ipairs(m:GetChildren()) do
+		if c:IsA("BasePart") and c.Name:sub(1, 2) == "HT" then c:SetAttribute("Hair", true) end
+	end
 	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
 	addTrail(m, "RightLowerArm", VIOLET); addTrail(m, "LeftLowerArm", VIOLET)
 	return m
@@ -2344,6 +2551,7 @@ local Config = require(ReplicatedStorage:WaitForChild("BGConfig"))
 local Clips = require(ReplicatedStorage:WaitForChild("BGClips"))
 local Rig = require(ReplicatedStorage:WaitForChild("BGRig"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
+local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
@@ -2483,6 +2691,16 @@ local function ghost(model, color)
 end
 
 local shakeUntil, shakePower = 0, 0
+local closeShot, camRoll, fovKick = nil, 0, 0     -- close-ups on big hits, a small tilt and a FOV punch
+local function closeUp(pos, attId, dur)
+	local fwd = Vector3.new(math.cos(rs[attId].ang), 0, math.sin(rs[attId].ang))
+	local right = Vector3.new(-fwd.Z, 0, fwd.X)
+	closeShot = { cf = CFrame.lookAt(pos + right * 3.4 + Vector3.new(0, 0.8, 0), pos), fov = 30, untilT = os.clock() + (dur or 0.32) }
+	camRoll = (math.random() < 0.5 and -1 or 1) * 4
+end
+local function topDown(pos, dur)
+	closeShot = { cf = CFrame.lookAt(pos + Vector3.new(0.5, 10, 2.5), pos), fov = 46, untilT = os.clock() + (dur or 0.55) }
+end
 local function shake(power, dur) shakePower, shakeUntil = power, os.clock() + dur end
 
 local function partPos(id, name)
@@ -2658,7 +2876,7 @@ local function onEvent(e)
 		if n == "afterimage" then ghost(rs[id].model, CYAN)
 		elseif n == "windup_charge" then sparks(hand, colorOf(id), 0.5, 10)
 		elseif n == "pulse_gather" then pulseBall(chestPos(id), colorOf(id), 5, 0.6, 0.3, 0.7)
-		elseif n == "pulse_chest" then pulseBall(chestPos(id), colorOf(id), 1, 7, 0.35, 0.5); shake(0.15, 0.25)
+		elseif n == "pulse_chest" then pulseBall(chestPos(id), colorOf(id), 1, 7, 0.35, 0.5); shake(0.15, 0.25); Style.flash(colorOf(id), 0.12, 0.3); Style.ringSlash(chestPos(id), colorOf(id), 6, 90, 0.3, 0)
 		elseif n == "pulse_forearms" then
 			pulseBall(chestPos(id), colorOf(id), 1, 6, 0.35, 0.5)
 			for _, h in ipairs({ "RightLowerArm", "LeftLowerArm" }) do local p = partPos(id, h); if p then pulseBall(p, colorOf(id), 0.5, 3, 0.3, 0.4) end end
@@ -2674,13 +2892,19 @@ local function onEvent(e)
 			local form = rs[id].form
 			local d = big and (Config.horizon.radius * 2) or ((form == "Base") and Config.hits.ren_pulse.range * 2 or Config.hits.ren_pulse.range1 * 2)
 			groundRing(Vector3.new(e.x, 0, e.z), colorOf(id), 1.5, d, big and 0.45 or 0.3)
+			Style.crack(Vector3.new(e.x, 0, e.z), colorOf(id), big and 18 or 10, big and 12 or d / 2)
+			if big then Style.speedLines(colorOf(id), 0.3, 30); Style.flash(Color3.new(1, 1, 1), 0.1, 0.5) end
 			shake(big and 0.5 or 0.25, 0.3)
 		end
 	elseif e.type == "hit" then
 		local pos = contactPos(e.by, e.f)
 		local size = math.clamp(0.5 + e.dmg / 16, 0.5, 1.4)
-		sparks(pos, e.armor and Color3.fromRGB(225, 225, 235) or colorOf(e.by), size, nil)
-		if e.final or e.dmg >= 10 then shake(0.3, 0.2) elseif e.dmg >= 5 then shake(0.1, 0.12) end
+		local col = e.armor and Color3.fromRGB(225, 225, 235) or colorOf(e.by)
+		sparks(pos, col, size * 0.5, nil)
+		local big = e.final or e.dmg >= 10
+		if big then Style.impact(pos, col, 1.5); closeUp(pos, e.by); fovKick = 7; shake(0.3, 0.2)
+		elseif e.dmg >= 5 then Style.impact(pos, col, 0.6); fovKick = math.max(fovKick, 3); shake(0.1, 0.12)
+		else Style.shards(pos, col, 6, 7) end
 	elseif e.type == "block" then
 		sparks(contactPos(e.by, e.f), Color3.fromRGB(235, 235, 255), 0.5, nil)
 		local kid = e.f
@@ -2695,6 +2919,8 @@ local function onEvent(e)
 	elseif e.type == "timed" then
 		ripple(chestPos(e.f), forward(e.f), VIOLET)
 		sparks(contactPos(e.by, e.f), VIOLET, 1.0, nil)
+		Style.ringSlash(chestPos(e.f) + forward(e.f) * 1.2, VIOLET, 6, 90, 0.3, 0)
+		Style.flash(Color3.new(1, 1, 1), 0.06, 0.3)
 		for _, p in ipairs(rs[e.f].deco.Seam) do
 			p.Transparency = 0.05
 			if rs[e.f].form == "Base" then TweenService:Create(p, TweenInfo.new(0.6), { Transparency = 1 }):Play() end
@@ -2707,10 +2933,12 @@ local function onEvent(e)
 	elseif e.type == "slam" then
 		if e.big then
 			groundRing(Vector3.new(e.x, 0, e.z), CYAN, 1.5, 22, 0.5)      -- the single expanding Thunderfall ring
+			Style.ink(0.45); Style.crack(Vector3.new(e.x, 0, e.z), CYAN, 16, 12); topDown(Vector3.new(e.x, 1, e.z), 0.55)
 			sparks(Vector3.new(e.x, 1, e.z), Color3.fromRGB(220, 240, 255), 1.4, 30)
 			shake(0.7, 0.4)
 		else
 			groundRing(Vector3.new(e.x, 0, e.z), BLUE, 1, 6, 0.25)         -- compact follow-up impact
+			Style.shards(Vector3.new(e.x, 0.6, e.z), BLUE, 10, 8, Vector3.new(0, 1, 0)); Style.crack(Vector3.new(e.x, 0, e.z), BLUE, 7, 4)
 			sparks(Vector3.new(e.x, 0.8, e.z), BLUE, 0.9, nil)
 			shake(0.25, 0.2)
 		end
@@ -2869,12 +3097,15 @@ RunService:BindToRenderStep("BGCamera", Enum.RenderPriority.Camera.Value + 1, fu
 	local back = 8.5 + math.min(gap, 14) * 0.35
 	local pos = Vector3.new(me.x, 0, me.z) - dir * back + right * 2.6 + Vector3.new(0, 5.2 + math.min(gap, 14) * 0.1, 0)
 	local target = CFrame.lookAt(pos, mid)
-	local fov = 52
-	if not camCF then camCF, camFov = target, fov end
+	local fov = 52 - fovKick
+	fovKick *= math.exp(-dt * 7)
 	local a = 1 - math.exp(-dt * 8)
+	if closeShot and os.clock() < closeShot.untilT then target, fov, a = closeShot.cf, closeShot.fov, 1 - math.exp(-dt * 22) end
+	if not camCF then camCF, camFov = target, fov end
 	camCF = camCF:Lerp(target, a)
 	camFov += (fov - camFov) * a
-	local cf = camCF
+	camRoll *= math.exp(-dt * 6)
+	local cf = camCF * CFrame.Angles(0, 0, math.rad(camRoll))
 	if os.clock() < shakeUntil then
 		local s = shakePower
 		cf = cf * CFrame.new((math.random() - 0.5) * s, (math.random() - 0.5) * s, 0)
@@ -3090,6 +3321,7 @@ end)
 stage:GetAttributeChangedSignal("Mode"):Connect(function()
 	if playing() then
 		held.W, held.A, held.S, held.D = false, false, false, false
+		Style.setEnabled(true)
 	end
 end)
 print("[BG] client ready. Tab = playable / cinematic. In Studio: use the left panel to pick the fighter, dummy mode and form.")
@@ -3111,6 +3343,7 @@ local Workspace = game:GetService("Workspace")
 local Engine = require(ReplicatedStorage:WaitForChild("BGEngine"))
 local Data = require(ReplicatedStorage:WaitForChild("BGCinematicData"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
+local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
@@ -3248,6 +3481,7 @@ local function fireMarkers(prevT, t)
 					if b.marker == mk.name then
 						local c = info[b.contact]
 						burst(c.C, b.color, b.size, c.n or Vector3.new(1, 0, 0))
+						Style.impact(c.C, b.color, b.size >= 1 and 1.5 or 0.7)
 					end
 				end
 			end
@@ -3403,6 +3637,7 @@ RunService:BindToRenderStep("ShowcasePose", Enum.RenderPriority.Camera.Value - 1
 	end
 	-- the parts only show a pose one frame after it is applied, so measure the previous frame's pose against them
 	if pendingMeasure then measureFeet(pendingMeasure.snap, pendingMeasure.t); pendingMeasure = nil end
+	Style.setEnabled(state.vfx)
 	local snap = applyPose(state.t)
 	if state.t == 0 and not startSnapshot then passStartSnapshot(snap) end
 	clothB:update(snap.Blue.out.cf.UpperTorso, dtSim)

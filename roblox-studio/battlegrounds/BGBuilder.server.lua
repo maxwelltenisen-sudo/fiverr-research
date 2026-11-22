@@ -61,10 +61,10 @@ end
 
 ---------------------------------------------------------------- stage: moonlit stone arena
 Lighting.ClockTime = 0
-Lighting.Brightness = 2
-Lighting.ExposureCompensation = 0.55
-Lighting.Ambient = Color3.fromRGB(80, 85, 130)
-Lighting.OutdoorAmbient = Color3.fromRGB(95, 100, 150)
+Lighting.Brightness = 1.7
+Lighting.ExposureCompensation = 0.45
+Lighting.Ambient = Color3.fromRGB(62, 66, 105)
+Lighting.OutdoorAmbient = Color3.fromRGB(78, 82, 125)
 
 local function fx(inst)
 	inst:SetAttribute("ShowcaseFX", true)
@@ -75,19 +75,22 @@ local atmo = Instance.new("Atmosphere")
 atmo.Density = 0.28; atmo.Offset = 0.2; atmo.Color = Color3.fromRGB(100, 110, 175); atmo.Decay = Color3.fromRGB(40, 45, 90)
 fx(atmo)
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.6; bloom.Size = 22; bloom.Threshold = 0.95
+bloom.Intensity = 0.9; bloom.Size = 26; bloom.Threshold = 0.9
 fx(bloom)
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.12; cc.Saturation = 0.1; cc.TintColor = Color3.fromRGB(225, 225, 255)
+cc.Contrast = 0.28; cc.Saturation = -0.2; cc.TintColor = Color3.fromRGB(225, 228, 255)   -- high contrast, desaturated world: blue and violet are the only colours
 fx(cc)
+local dof = Instance.new("DepthOfFieldEffect")
+dof.FarIntensity = 0.12; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28
+fx(dof)
 
 local R = Config.arena.radius
-local STONE, STONE2, STONE3 = Color3.fromRGB(78, 82, 100), Color3.fromRGB(58, 62, 80), Color3.fromRGB(96, 100, 122)
+local STONE, STONE2, STONE3 = Color3.fromRGB(58, 60, 74), Color3.fromRGB(40, 42, 56), Color3.fromRGB(78, 80, 98)
 part({ Name = "Ground", Size = Vector3.new(500, 1, 500), Position = Vector3.new(0, -0.5, 0), Color = Color3.fromRGB(28, 30, 42),
 	Material = Enum.Material.Slate, CanCollide = true })
 -- raised stone disc
 part({ Name = "ArenaFloor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, (R + 3) * 2, (R + 3) * 2),
-	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE, Material = Enum.Material.Cobblestone, CanCollide = true })
+	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(30, 32, 44), Material = Enum.Material.Slate, Reflectance = 0.3, CanCollide = true })   -- dark glossy floor
 part({ Size = Vector3.new(0.1, (R + 3.4) * 2, (R + 3.4) * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, -0.02, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE3, Material = Enum.Material.Slate })
 part({ Size = Vector3.new(0.12, R * 2, R * 2), Shape = Enum.PartType.Cylinder,
@@ -131,6 +134,17 @@ for _, spec in ipairs({ { Vector3.new(-10, 12, 10), Color3.fromRGB(110, 170, 255
 	local l = Instance.new("PointLight")
 	l.Color = spec[2]; l.Range = 48; l.Brightness = spec[3]
 	l.Parent = lp
+end
+-- drifting motes (blue and violet) over the arena: a quiet particle layer that is always present
+for i, col in ipairs({ BLUE, VIOLET }) do
+	local mp = part({ Name = "Motes" .. i, Size = Vector3.new(34, 1, 34), Position = Vector3.new(0, 14, 0), Transparency = 1 })
+	local pe = Instance.new("ParticleEmitter")
+	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	pe.Color = ColorSequence.new(col); pe.LightEmission = 1; pe.Rate = 7
+	pe.Lifetime = NumberRange.new(7, 10); pe.Speed = NumberRange.new(0.4, 1.2)
+	pe.EmissionDirection = Enum.NormalId.Bottom; pe.SpreadAngle = Vector2.new(20, 20)
+	pe.Size = NumberSequence.new(0.16, 0.1); pe.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	pe.Parent = mp
 end
 local focus = part({ Name = "FocusPoint", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 4, 0), Transparency = 1 })
 local function setFocus(plr) pcall(function() plr.ReplicationFocus = focus end) end
@@ -347,6 +361,13 @@ local function buildRen()
 	-- split hem: two flaps at the back, violet lining shows when they swing
 	for k, x in ipairs({ -0.52, 0.52 }) do
 		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.95, 0.75, 0.14), coat, VIOLET)
+	end
+	-- two long hair tails from the back of the head: cloth chains that swing with the body
+	for k, x in ipairs({ -0.3, 0.3 }) do
+		cloth(m, "Head", "HT" .. k, CFrame.new(x, 0.15, 0.6), 3, Vector3.new(0.42, 1.0, 0.14), hairC)
+	end
+	for _, c in ipairs(m:GetChildren()) do
+		if c:IsA("BasePart") and c.Name:sub(1, 2) == "HT" then c:SetAttribute("Hair", true) end
 	end
 	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
 	addTrail(m, "RightLowerArm", VIOLET); addTrail(m, "LeftLowerArm", VIOLET)
