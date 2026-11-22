@@ -429,14 +429,14 @@ C.guard = {
 C.slip = { counterWindow = 1.1 } -- seconds Kael can press the counter after a clean dodge
 C.openDamageMult = 1.25          -- damage multiplier while "open" (after a missed Arc Breaker / Storm Pierce)
 C.eclipseCounterMult = 1.6       -- stored Eclipse Guard energy multiplies the next Void Counter
-C.combo = { reset = 0.8, buffer = 0.3 }
+C.combo = { reset = 0.8, buffer = 0.45 }   -- a press this long before the chain point still counts (forgiving spam)
 
 -- meter gains
 C.gain = { block = 3, timedBlock = 12, dodge = 10, counterLanded = 6 }
 
 C.char = {
-	Kael = { walk = 7.5, backWalk = 5.5, guardWalk = 3.0, turn = 720 },
-	Ren  = { walk = 6.2, backWalk = 4.6, guardWalk = 2.4, turn = 540 },
+	Kael = { walk = 10.0, backWalk = 7.0, guardWalk = 3.6, turn = 900 },
+	Ren  = { walk = 8.2, backWalk = 5.8, guardWalk = 3.0, turn = 720 },
 }
 
 -- Cooldowns (seconds) for each skill id.
@@ -452,7 +452,7 @@ C.hits = {
 	kael_jab    = { dmg = 4,  range = 3.5, arc = 100, stagger = 0.28, mg = 4 },
 	kael_cross  = { dmg = 5,  range = 3.6, arc = 100, stagger = 0.30, mg = 4 },
 	kael_hook   = { dmg = 6,  range = 3.5, arc = 110, stagger = 0.34, mg = 5 },
-	kael_palm   = { dmg = 8,  range = 3.7, arc = 100, stagger = 0.60, push = 4.5, mg = 7 },   -- final hit pushes
+	kael_palm   = { dmg = 8,  range = 3.7, arc = 100, stagger = 0.60, push = 7.0, mg = 7 },   -- final hit pushes
 	kael_arc    = { dmg = 12, range = 5.4, arc = 90,  stagger = 0.90, stagger1 = 1.25, mg = 10 },
 	kael_sky    = { dmg = 7,  range = 3.7, arc = 100, launch = true, airTime = 1.0, airH = 3.6, mg = 8 },
 	kael_skyfollow = { dmg = 10, mg = 8, stagger = 0.8 },
@@ -464,12 +464,20 @@ C.hits = {
 	ren_jab     = { dmg = 4,  range = 3.4, arc = 100, stagger = 0.28, mg = 4 },
 	ren_elbow   = { dmg = 5,  range = 3.2, arc = 110, stagger = 0.30, mg = 4 },
 	ren_backfist = { dmg = 6, range = 3.6, arc = 120, stagger = 0.34, mg = 5 },
-	ren_palm    = { dmg = 11, range = 3.6, arc = 100, stagger = 0.75, push = 3.8, mg = 8 },
+	ren_palm    = { dmg = 11, range = 3.6, arc = 100, stagger = 0.75, push = 6.0, mg = 8 },
 	ren_pulse   = { dmg = 6,  range = 5.5, range1 = 6.8, arc = 360, push = 6.0, stagger = 0.5, area = true, mg = 8 },
 	ren_counter = { dmg = 12, range = 6.5, arc = 180, stagger = 1.0, push = 3.0, mg = 8 },
 	ren_horizon_blast = { dmg = 28, range = 12, arc = 360, push = 7.0, stagger = 1.3, area = true, unblockable = true, mg = 0 },
 }
 C.horizon = { radius = 12, pullSpeed = 6 }    -- Event Horizon field radius and inward pull (studs per second)
+
+-- Power forms make the fighter hit harder, move faster and swing faster (tempo scales the action clock).
+C.form = {
+	Form1 = { dmg = 1.15, tempo = 1.15, speed = 1.12 },
+	Final = { dmg = 1.4,  tempo = 1.3,  speed = 1.25 },
+}
+-- Hit-stop: both fighters freeze for a few frames on a landed hit (this is most of what makes a punch feel heavy).
+C.hitstop = { light = 0.05, big = 0.095, block = 0.03 }
 
 C.transformInvuln = 1.0
 C.knocked = 0.55                  -- getting-up time after a launch lands
@@ -594,7 +602,7 @@ K.m1_1 = clip(0.42, {
 	{ t = 0.15, ease = "in2", lh = H(2.0, -0.35, 0.95), twist = -2, lean = 9 },
 	{ t = 0.3, ease = "out2", lh = H(1.15, -0.5, 0.85), twist = -8, lean = 6 },
 	{ t = 0.42, ease = "inout" },
-}, { chain = 0.27, move = { { from = 0.04, to = 0.16, dist = 0.8, dir = "fwd" } },
+}, { chain = 0.27, move = { { from = 0.04, to = 0.16, dist = 1.5, dir = "fwd" } },
 	markers = { hit(0.15, "kael_jab", "LeftHand", "contact_jab") } })
 K.m1_2 = clip(0.5, {
 	{ t = 0 },
@@ -602,7 +610,7 @@ K.m1_2 = clip(0.5, {
 	{ t = 0.2, ease = "in2", pyaw = 12, twist = 14, lean = 14, rh = H(2.0, 0.6, 0.9), rfPitch = 25, rfYaw = -16 },
 	{ t = 0.35, ease = "out2", pyaw = -18, twist = -8, lean = 8, rh = H(0.9, 0.5, 0.85), rfPitch = 0, rfYaw = -38 },
 	{ t = 0.5, ease = "inout", pyaw = -22, lean = 6, rh = H(0.85, 0.5, 0.8) },
-}, { chain = 0.3, move = { { from = 0.06, to = 0.2, dist = 0.7, dir = "fwd" } },
+}, { chain = 0.3, move = { { from = 0.06, to = 0.2, dist = 1.4, dir = "fwd" } },
 	markers = { hit(0.2, "kael_cross", "RightHand", "contact_cross") } })
 K.m1_3 = clip(0.58, {
 	{ t = 0 },
@@ -610,7 +618,7 @@ K.m1_3 = clip(0.58, {
 	{ t = 0.22, ease = "in2", crouch = 0.58, lean = 18, pyaw = 6, twist = 10, lh = H(1.55, 0.3, -0.35), lp = H(0.3, -0.7, -0.6) },
 	{ t = 0.38, ease = "out2", crouch = 0.42, lean = 9, pyaw = -22, twist = -8, lh = H(1.15, -0.5, 0.85), lp = H(0.2, -0.9, -0.6) },
 	{ t = 0.58, ease = "inout", crouch = 0.35, lean = 6 },
-}, { chain = 0.34, move = { { from = 0.08, to = 0.22, dist = 0.6, dir = "fwd" } },
+}, { chain = 0.34, move = { { from = 0.08, to = 0.22, dist = 1.2, dir = "fwd" } },
 	markers = { hit(0.22, "kael_hook", "LeftHand", "contact_hook") } })
 K.m1_4 = clip(0.78, {
 	{ t = 0 },
@@ -618,7 +626,7 @@ K.m1_4 = clip(0.78, {
 	{ t = 0.26, ease = "in2", crouch = 0.22, lean = 4, pyaw = 10, twist = 12, rh = H(1.9, 0.45, 1.15), rfPitch = 30, rfYaw = -18 },
 	{ t = 0.5, ease = "out2", crouch = 0.38, lean = 8, rh = H(1.2, 0.5, 0.9), rfPitch = 8 },
 	{ t = 0.78, ease = "inout", pyaw = -22, twist = -8, lean = 6, crouch = 0.35, rh = H(0.85, 0.5, 0.8), rfPitch = 0, rfYaw = -38 },
-}, { move = { { from = 0.1, to = 0.28, dist = 1.0, dir = "fwd" } },
+}, { move = { { from = 0.1, to = 0.28, dist = 1.9, dir = "fwd" } },
 	trail = { { from = 0.2, to = 0.4, hand = "RightHand" } },
 	markers = { hit(0.26, "kael_palm", "RightHand", "contact_palm") } })
 
@@ -628,7 +636,7 @@ K.flash = clip(0.42, {
 	{ t = 0.16, ease = "linear", crouch = 0.62, lean = 22, lf = F(1.5, -0.35, 0.25), rf = F(-1.2, 0.55, 0.25) },
 	{ t = 0.3, ease = "out2", crouch = 0.5, lean = 10, lf = F(0.9, -0.35, 0), rf = F(-0.6, 0.55, 0) },
 	{ t = 0.42, ease = "inout" },
-}, { move = { { from = 0.06, to = 0.2, dist = 8.0, dir = "input" } },
+}, { move = { { from = 0.06, to = 0.2, dist = 10.0, dir = "input" } },
 	markers = { { t = 0.06, name = "afterimage" } } })
 K.flash_back = clip(0.42, {
 	{ t = 0 },
@@ -771,7 +779,7 @@ R.m1_1 = clip(0.5, {
 	{ t = 0.17, ease = "in2", lh = H(1.9, -0.25, 0.95), lean = 6, twist = -4 },
 	{ t = 0.32, ease = "out2", lh = H(0.95, -0.4, 1.0), lean = 3, twist = -6 },
 	{ t = 0.5, ease = "inout" },
-}, { chain = 0.3, move = { { from = 0.05, to = 0.18, dist = 0.5, dir = "fwd" } },
+}, { chain = 0.3, move = { { from = 0.05, to = 0.18, dist = 1.2, dir = "fwd" } },
 	markers = { hit(0.17, "ren_jab", "LeftHand", "contact_jab") } })
 R.m1_2 = clip(0.52, {
 	{ t = 0 },
@@ -779,7 +787,7 @@ R.m1_2 = clip(0.52, {
 	{ t = 0.19, ease = "in2", pyaw = 16, twist = 20, lean = 10, rh = H(1.35, 0.45, 1.0), rp = H(0.5, 0.9, -0.2) },
 	{ t = 0.34, ease = "out2", pyaw = -18, twist = -6, lean = 3, rh = H(0.8, 0.35, 0.95), rp = H(0.0, 0.55, -0.85) },
 	{ t = 0.52, ease = "inout", crouch = 0.5 },
-}, { chain = 0.32, move = { { from = 0.06, to = 0.2, dist = 0.5, dir = "fwd" } },
+}, { chain = 0.32, move = { { from = 0.06, to = 0.2, dist = 1.1, dir = "fwd" } },
 	markers = { hit(0.19, "ren_elbow", "RightHand", "contact_elbow") } })
 R.m1_3 = clip(0.66, {
 	{ t = 0 },
@@ -787,7 +795,7 @@ R.m1_3 = clip(0.66, {
 	{ t = 0.29, ease = "in2", pyaw = 40, twist = 30, lean = 8, crouch = 0.5, rh = H(1.6, -0.35, 1.05), rp = H(0.3, 0.8, -0.4), headYaw = 6 },
 	{ t = 0.46, ease = "out2", pyaw = -4, twist = 0, lean = 4, rh = H(1.0, 0.2, 1.0) },
 	{ t = 0.66, ease = "inout", pyaw = -18, twist = -6, lean = 3, rh = H(0.78, 0.35, 0.95), headYaw = 0, rp = H(0.0, 0.55, -0.85) },
-}, { chain = 0.4, move = { { from = 0.1, to = 0.3, dist = 0.6, dir = "fwd" } },
+}, { chain = 0.4, move = { { from = 0.1, to = 0.3, dist = 1.3, dir = "fwd" } },
 	trail = { { from = 0.2, to = 0.4, hand = "RightHand" } },
 	markers = { hit(0.29, "ren_backfist", "RightHand", "contact_backfist") } })
 R.m1_4 = clip(1.2, {
@@ -797,7 +805,7 @@ R.m1_4 = clip(1.2, {
 	{ t = 0.65, ease = "in3", crouch = 0.52, lean = 16, pyaw = 22, twist = 24, rh = H(2.0, 0.45, 1.0), lf = F(1.3, -0.4, 0), rfPitch = 25 },
 	{ t = 0.85, ease = "out2", crouch = 0.62, lean = 12, rh = H(1.7, 0.4, 1.0) },
 	{ t = 1.2, ease = "inout", crouch = 0.5, lean = 3, pyaw = -18, twist = -6, rh = H(0.78, 0.35, 0.95), lf = F(0.55, -0.4, 0), rfPitch = 0 },
-}, { move = { { from = 0.45, to = 0.67, dist = 1.4, dir = "fwd" } }, anticipation = { 0.2, 0.6 },
+}, { move = { { from = 0.45, to = 0.67, dist = 2.2, dir = "fwd" } }, anticipation = { 0.2, 0.6 },
 	trail = { { from = 0.58, to = 0.85, hand = "RightHand" } },
 	markers = { { t = 0.3, name = "anticipation_set" }, hit(0.65, "ren_palm", "RightHand", "contact_palm") } })
 
@@ -867,6 +875,38 @@ end
 
 Clips.Kael, Clips.Ren = K, R
 
+-- SPEED: the keyframes above are authored at "1.0"; the game plays them faster (k < 1 shortens every non-looping clip:
+-- keys, markers, move / lift / window times). Change DEFAULT_SPEED to taste, or call Clips.setSpeed(1) for the authored timing.
+Clips.DEFAULT_SPEED = 0.78
+local function deep(t)
+	if type(t) ~= "table" then return t end
+	local r = {}
+	for k, v in pairs(t) do r[k] = deep(v) end
+	return r
+end
+local ORIG = { Kael = deep(K), Ren = deep(R) }
+local function scaleClip(c, k)
+	c.dur = c.dur * k
+	for _, key in ipairs(c.keys) do key.t = key.t * k end
+	for _, mk in ipairs(c.markers) do mk.t = mk.t * k end
+	if c.chain then c.chain = c.chain * k end
+	for _, list in ipairs({ c.move or {}, c.lift or {}, c.win or {}, c.trail or {} }) do
+		for _, x in ipairs(list) do x.from, x.to = x.from * k, x.to * k end
+	end
+	if c.anticipation then c.anticipation = { c.anticipation[1] * k, c.anticipation[2] * k } end
+end
+function Clips.setSpeed(k)
+	for char, set in pairs(ORIG) do
+		for name, c in pairs(set) do
+			local n = deep(c)
+			if not n.loop and k ~= 1 then scaleClip(n, k) end
+			Clips[char][name] = n
+		end
+	end
+	Clips.speed = k
+end
+Clips.setSpeed(Clips.DEFAULT_SPEED)
+
 -- Engine data for one fighter (what BGEngine.bake wants): every clip becomes a named track.
 function Clips.engineData(char)
 	local fighters = {}
@@ -909,7 +949,7 @@ end
 
 function Core.new(cfg, clips, opts)
 	opts = opts or {}
-	local w = setmetatable({ cfg = cfg, clips = clips, t = 0, events = {}, rng = opts.rng or math.random }, Core)
+	local w = setmetatable({ cfg = cfg, clips = clips, t = 0, freeze = 0, events = {}, rng = opts.rng or math.random }, Core)
 	w.f = {
 		Blue = newFighter("Blue", "Kael", -cfg.arena.spawn, 0, 0),
 		Purple = newFighter("Purple", "Ren", cfg.arena.spawn, 0, math.pi),
@@ -929,6 +969,7 @@ function Core:reset()
 		self.f[id] = nf
 	end
 	for _, ai in pairs(self.ai) do ai.queue = {}; ai.nextAt = self.t + 1.5 end
+	self.freeze = 0
 	self:emit("reset", {})
 end
 
@@ -947,6 +988,11 @@ function Core:meta(f, name) return self.clips[f.char][name] end
 ---------------------------------------------------------------------------------------------- helpers
 local function fwdVec(f) return math.cos(f.ang), math.sin(f.ang) end
 local function rightVec(f) return -math.sin(f.ang), math.cos(f.ang) end
+
+function Core:tempo(f)
+	local fm = self.cfg.form[f.form]
+	return fm and fm.tempo or 1
+end
 
 function Core:setClip(f, name, speed)
 	f.clip, f.clipT0, f.clipSpeed, f.seq = name, self.t, speed or 1, f.seq + 1
@@ -1033,7 +1079,7 @@ function Core:startAct(f, name, extra)
 	a.dirx, a.dirz = vx / l, vz / l
 	a.sideSign = (f.inS < -0.3) and -1 or 1
 	f.act = a
-	self:setClip(f, name)
+	self:setClip(f, name, self:tempo(f))
 	self:emit("act", { f = f.id, clip = name })
 	return a
 end
@@ -1126,6 +1172,7 @@ function Core:resolveHit(att, hid, a, opts)
 		if -ux * tx + -uz * tz >= math.cos(math.rad(cfg.guard.arc / 2)) then
 			local timed = tgt.char == "Ren" and (self.t - tgt.guardStart) <= cfg.guard.timedWindow
 			self:damage(tgt, dmg * cfg.guard.blockMult, att)
+			self.freeze = math.max(self.freeze, cfg.hitstop.block)
 			a.blocked = true
 			self:applyPush(tgt, ux, uz, cfg.guard.blockPush, 0.15)
 			if timed then
@@ -1150,9 +1197,12 @@ function Core:resolveHit(att, hid, a, opts)
 		end
 	end
 
+	local fm = cfg.form[att.form]
+	if fm then dmg = dmg * fm.dmg end
 	if tgt.state == "open" then dmg = dmg * cfg.openDamageMult end
 	if opts.dmgMult then dmg = dmg * opts.dmgMult end
 	self:damage(tgt, dmg, att)
+	self.freeze = math.max(self.freeze, ((h.push or 0) > 0 or dmg >= 10) and cfg.hitstop.big or cfg.hitstop.light)
 	a.landed = true
 	self:addMeter(att, h.mg or 0)
 
@@ -1469,7 +1519,7 @@ function Core:updateFighter(f, dt)
 	local a = f.act
 	if a then
 		local prev = a.t
-		a.t = a.t + dt
+		a.t = a.t + dt * self:tempo(f)
 		local m = a.meta
 		if m.move and not m.noMove then
 			for _, mv in ipairs(m.move) do
@@ -1520,7 +1570,9 @@ function Core:updateFighter(f, dt)
 		if l > 0.05 then
 			if l > 1 then vx, vz, l = vx / l, vz / l, 1 end
 			local ch = cfg.char[f.char]
-			local sp = (f.state == "block") and ch.guardWalk or ((f.inF < -0.3 and math.abs(f.inS) < 0.6) and ch.backWalk or ch.walk)
+			local fmv = cfg.form[f.form]
+			local base = (f.state == "block") and ch.guardWalk or ((f.inF < -0.3 and math.abs(f.inS) < 0.6) and ch.backWalk or ch.walk)
+			local sp = base * (fmv and fmv.speed or 1)
 			self:moveBy(f, vx / l * sp * l * dt, vz / l * sp * l * dt)
 			f.moving, f.moveBack = true, f.inF < -0.3 and math.abs(f.inS) < 0.6
 			f.moveSpeed = sp * l
@@ -1549,6 +1601,18 @@ end
 
 function Core:update(dt)
 	self.t = self.t + dt
+	if self.freeze > 0 then            -- hit-stop: clips, actions and timers hold still for a few frames
+		self.freeze = self.freeze - dt
+		for _, f in pairs(self.f) do
+			f.clipT0 = f.clipT0 + dt
+			f.staggerUntil = f.staggerUntil + dt
+			f.openUntil = f.openUntil + dt
+			f.knockedUntil = f.knockedUntil + dt
+			if f.air then f.air.t0 = f.air.t0 + dt end
+			if f.push then f.push.left = f.push.left + 0 end
+		end
+		return
+	end
 	for _, id in ipairs({ "Blue", "Purple" }) do self:updateAI(self.f[id], dt) end
 	for _, id in ipairs({ "Blue", "Purple" }) do self:updateFighter(self.f[id], dt) end
 	-- overlap separation (grounded fighters only)
@@ -2785,6 +2849,34 @@ local function handEmitters(id, rate, color)
 	end
 end
 
+-- body aura for power forms: rising sparks + a glow on the torso (rate 0 removes it)
+local function aura(id, rate, color, brightness, range)
+	local torso = rs[id].model:FindFirstChild("UpperTorso")
+	if not torso then return end
+	local e, l = torso:FindFirstChild("BGAura"), torso:FindFirstChild("BGGlow")
+	if rate <= 0 then
+		if e then e:Destroy() end
+		if l then l:Destroy() end
+		return
+	end
+	if not e then
+		e = Instance.new("ParticleEmitter")
+		e.Name = "BGAura"
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.LightEmission = 1; e.Lifetime = NumberRange.new(0.5, 0.9); e.Speed = NumberRange.new(3, 7)
+		e.EmissionDirection = Enum.NormalId.Top; e.SpreadAngle = Vector2.new(35, 35)
+		e.Size = NumberSequence.new(0.35, 0); e.Transparency = NumberSequence.new(0.1, 1)
+		e.Parent = torso
+	end
+	if not l then
+		l = Instance.new("PointLight")
+		l.Name = "BGGlow"
+		l.Parent = torso
+	end
+	e.Rate, e.Color = rate, ColorSequence.new(color)
+	l.Color, l.Brightness, l.Range = color, brightness, range
+end
+
 local function setSeams(deco, color, transparency, material)
 	for _, p in ipairs(deco.Seam) do
 		p.Color, p.Transparency = color, transparency
@@ -2802,18 +2894,18 @@ local function applyForm(id, form, prev)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 1 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
 			for _, p in ipairs(d.Bracer) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
-			setHighlight(id, false); handEmitters(id, 0, CYAN)
+			setHighlight(id, false); handEmitters(id, 0, CYAN); aura(id, 0)
 		elseif form == "Form1" then
 			setSeams(d, Color3.fromRGB(120, 235, 255), 0)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 0 end        -- scarf trails slightly longer
-			setHighlight(id, false); handEmitters(id, 7, CYAN)
+			setHighlight(id, false); handEmitters(id, 7, CYAN); aura(id, 22, CYAN, 1.6, 14)
 		else
 			setSeams(d, Color3.fromRGB(205, 240, 255), 0)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 0 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = Color3.fromRGB(215, 238, 255), Enum.Material.Neon end   -- blue-white eyes
 			for _, p in ipairs(d.Bracer) do p.Color, p.Material = Color3.fromRGB(110, 130, 170), Enum.Material.Neon end -- brighter forearm guards
 			setHighlight(id, true, Color3.fromRGB(170, 225, 255), 0.5)
-			handEmitters(id, 16, Color3.fromRGB(190, 230, 255))
+			handEmitters(id, 16, Color3.fromRGB(190, 230, 255)); aura(id, 55, Color3.fromRGB(190, 230, 255), 3, 22)
 		end
 	else
 		if form == "Base" then
@@ -2822,13 +2914,15 @@ local function applyForm(id, form, prev)
 			for _, p in ipairs(d.Accent) do p.Transparency = 1 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
 			for _, p in ipairs(d.Hair) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
-			setHighlight(id, false)
+			setHighlight(id, false); aura(id, 0)
 		elseif form == "Form1" then
 			setSeams(d, VIOLET, 0.05)                       -- violet lines illuminate across the bracers
 			for _, p in ipairs(d.Lining) do p.Transparency = 0.1 end   -- coat lining glows during turns
 			for _, p in ipairs(d.Accent) do p.Transparency = 1 end
+			aura(id, 20, VIOLET, 1.5, 14)
 		else
 			setSeams(d, Color3.fromRGB(200, 150, 255), 0)
+			aura(id, 50, Color3.fromRGB(205, 160, 255), 2.8, 22)
 			for _, p in ipairs(d.Lining) do p.Transparency = 0.05 end
 			for _, p in ipairs(d.Accent) do p.Transparency = 0.78 end   -- layered translucent accents on the bracers
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = Color3.fromRGB(175, 95, 255), Enum.Material.Neon end
@@ -3009,6 +3103,7 @@ local function blendTimeFor(clip)
 	return 0.12
 end
 
+local FASTCLIPS = { flash = true, flash_back = true, storm = true, arc = true, thunder = true, m1_4 = true, m1_2 = true, sky = true, void_counter = true, counter = true }
 local trailSets = {}
 local function updateTrails(r, meta, t)
 	local want = {}
@@ -3061,6 +3156,10 @@ RunService:BindToRenderStep("BGPose", Enum.RenderPriority.Camera.Value - 1, func
 			for jn, rt in pairs(out.rot) do r.motors[jn].Transform = rt end
 			r.cloth:update(world * out.cf.UpperTorso, dt)
 			updateTrails(r, meta, t)
+			if r.form ~= "Base" and FASTCLIPS[s.clip] and os.clock() - (r.lastGhost or 0) > 0.07 then
+				r.lastGhost = os.clock()
+				ghost(r.model, colorOf(id))     -- speed afterimages in power forms
+			end
 			if s.form ~= r.form then
 				local prev = r.form
 				r.form = s.form

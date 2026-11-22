@@ -2,6 +2,7 @@ local function readfile(p) local f = assert(io.open(p)); local s = f:read("a"); 
 dofile("shim.lua")
 local Engine = load(readfile("../BGEngine.lua"))()
 local Clips = load(readfile("../BGClips.lua"))()
+Clips.setSpeed(1)   -- tests are written against the authored timing
 local R = Engine.newRig(dofile("rig.lua"), { footY = 0.3, footZ = 1.0 })
 local function ang(a, b)
 	local m = a:Inverse() * b

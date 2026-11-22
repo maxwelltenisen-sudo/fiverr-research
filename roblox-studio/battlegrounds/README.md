@@ -44,6 +44,12 @@ Effects are shaped, short and tied to the action: sharp shards and crossing ring
 cracked-glass lines racing over the floor on slams, a white "ink" frame with black speed lines on Thunderfall, close-up and top-down camera cuts with a FOV punch and tilt on big hits.
 Ren has two long cloth hair tails. All of it lives in `BGStyle.lua` (+ the event handlers in `BGClient`); in the cinematic it only fires when VFX is on, so the VFX-off review stays clean.
 
+## Combat feel (tuning)
+* **Speed:** `BGClips.lua` is authored at 1.0 and played at `Clips.DEFAULT_SPEED = 0.78` (22% shorter). Lower = faster. Walk speeds are in `BGConfig.char`.
+* **Hit-stop:** `BGConfig.hitstop` (light 0.05 s, big 0.095 s, block 0.03 s): both fighters freeze on contact. Longer = heavier.
+* **Forms:** `BGConfig.form`: Charged/Rift Mode +15% damage, +15% swing speed, +12% move speed; Final form +40% / +30% / +25%. Power forms also get a body aura, a torso glow and speed afterimages.
+* **M1 lunges** travel 1.1-2.2 studs per hit so the combo keeps pressure; the final palm / palm knock back 6-7 studs. M1 presses up to 0.45 s early still chain.
+
 ## Moves
 | | Kael | Ren |
 |---|---|---|

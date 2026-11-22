@@ -28,7 +28,7 @@ end
 
 function Core.new(cfg, clips, opts)
 	opts = opts or {}
-	local w = setmetatable({ cfg = cfg, clips = clips, t = 0, events = {}, rng = opts.rng or math.random }, Core)
+	local w = setmetatable({ cfg = cfg, clips = clips, t = 0, freeze = 0, events = {}, rng = opts.rng or math.random }, Core)
 	w.f = {
 		Blue = newFighter("Blue", "Kael", -cfg.arena.spawn, 0, 0),
 		Purple = newFighter("Purple", "Ren", cfg.arena.spawn, 0, math.pi),
@@ -48,6 +48,7 @@ function Core:reset()
 		self.f[id] = nf
 	end
 	for _, ai in pairs(self.ai) do ai.queue = {}; ai.nextAt = self.t + 1.5 end
+	self.freeze = 0
 	self:emit("reset", {})
 end
 
@@ -66,6 +67,11 @@ function Core:meta(f, name) return self.clips[f.char][name] end
 ---------------------------------------------------------------------------------------------- helpers
 local function fwdVec(f) return math.cos(f.ang), math.sin(f.ang) end
 local function rightVec(f) return -math.sin(f.ang), math.cos(f.ang) end
+
+function Core:tempo(f)
+	local fm = self.cfg.form[f.form]
+	return fm and fm.tempo or 1
+end
 
 function Core:setClip(f, name, speed)
 	f.clip, f.clipT0, f.clipSpeed, f.seq = name, self.t, speed or 1, f.seq + 1
@@ -152,7 +158,7 @@ function Core:startAct(f, name, extra)
 	a.dirx, a.dirz = vx / l, vz / l
 	a.sideSign = (f.inS < -0.3) and -1 or 1
 	f.act = a
-	self:setClip(f, name)
+	self:setClip(f, name, self:tempo(f))
 	self:emit("act", { f = f.id, clip = name })
 	return a
 end
@@ -245,6 +251,7 @@ function Core:resolveHit(att, hid, a, opts)
 		if -ux * tx + -uz * tz >= math.cos(math.rad(cfg.guard.arc / 2)) then
 			local timed = tgt.char == "Ren" and (self.t - tgt.guardStart) <= cfg.guard.timedWindow
 			self:damage(tgt, dmg * cfg.guard.blockMult, att)
+			self.freeze = math.max(self.freeze, cfg.hitstop.block)
 			a.blocked = true
 			self:applyPush(tgt, ux, uz, cfg.guard.blockPush, 0.15)
 			if timed then
@@ -269,9 +276,12 @@ function Core:resolveHit(att, hid, a, opts)
 		end
 	end
 
+	local fm = cfg.form[att.form]
+	if fm then dmg = dmg * fm.dmg end
 	if tgt.state == "open" then dmg = dmg * cfg.openDamageMult end
 	if opts.dmgMult then dmg = dmg * opts.dmgMult end
 	self:damage(tgt, dmg, att)
+	self.freeze = math.max(self.freeze, ((h.push or 0) > 0 or dmg >= 10) and cfg.hitstop.big or cfg.hitstop.light)
 	a.landed = true
 	self:addMeter(att, h.mg or 0)
 
@@ -588,7 +598,7 @@ function Core:updateFighter(f, dt)
 	local a = f.act
 	if a then
 		local prev = a.t
-		a.t = a.t + dt
+		a.t = a.t + dt * self:tempo(f)
 		local m = a.meta
 		if m.move and not m.noMove then
 			for _, mv in ipairs(m.move) do
@@ -639,7 +649,9 @@ function Core:updateFighter(f, dt)
 		if l > 0.05 then
 			if l > 1 then vx, vz, l = vx / l, vz / l, 1 end
 			local ch = cfg.char[f.char]
-			local sp = (f.state == "block") and ch.guardWalk or ((f.inF < -0.3 and math.abs(f.inS) < 0.6) and ch.backWalk or ch.walk)
+			local fmv = cfg.form[f.form]
+			local base = (f.state == "block") and ch.guardWalk or ((f.inF < -0.3 and math.abs(f.inS) < 0.6) and ch.backWalk or ch.walk)
+			local sp = base * (fmv and fmv.speed or 1)
 			self:moveBy(f, vx / l * sp * l * dt, vz / l * sp * l * dt)
 			f.moving, f.moveBack = true, f.inF < -0.3 and math.abs(f.inS) < 0.6
 			f.moveSpeed = sp * l
@@ -668,6 +680,18 @@ end
 
 function Core:update(dt)
 	self.t = self.t + dt
+	if self.freeze > 0 then            -- hit-stop: clips, actions and timers hold still for a few frames
+		self.freeze = self.freeze - dt
+		for _, f in pairs(self.f) do
+			f.clipT0 = f.clipT0 + dt
+			f.staggerUntil = f.staggerUntil + dt
+			f.openUntil = f.openUntil + dt
+			f.knockedUntil = f.knockedUntil + dt
+			if f.air then f.air.t0 = f.air.t0 + dt end
+			if f.push then f.push.left = f.push.left + 0 end
+		end
+		return
+	end
 	for _, id in ipairs({ "Blue", "Purple" }) do self:updateAI(self.f[id], dt) end
 	for _, id in ipairs({ "Blue", "Purple" }) do self:updateFighter(self.f[id], dt) end
 	-- overlap separation (grounded fighters only)

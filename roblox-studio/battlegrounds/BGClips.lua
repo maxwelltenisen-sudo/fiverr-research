@@ -112,7 +112,7 @@ K.m1_1 = clip(0.42, {
 	{ t = 0.15, ease = "in2", lh = H(2.0, -0.35, 0.95), twist = -2, lean = 9 },
 	{ t = 0.3, ease = "out2", lh = H(1.15, -0.5, 0.85), twist = -8, lean = 6 },
 	{ t = 0.42, ease = "inout" },
-}, { chain = 0.27, move = { { from = 0.04, to = 0.16, dist = 0.8, dir = "fwd" } },
+}, { chain = 0.27, move = { { from = 0.04, to = 0.16, dist = 1.5, dir = "fwd" } },
 	markers = { hit(0.15, "kael_jab", "LeftHand", "contact_jab") } })
 K.m1_2 = clip(0.5, {
 	{ t = 0 },
@@ -120,7 +120,7 @@ K.m1_2 = clip(0.5, {
 	{ t = 0.2, ease = "in2", pyaw = 12, twist = 14, lean = 14, rh = H(2.0, 0.6, 0.9), rfPitch = 25, rfYaw = -16 },
 	{ t = 0.35, ease = "out2", pyaw = -18, twist = -8, lean = 8, rh = H(0.9, 0.5, 0.85), rfPitch = 0, rfYaw = -38 },
 	{ t = 0.5, ease = "inout", pyaw = -22, lean = 6, rh = H(0.85, 0.5, 0.8) },
-}, { chain = 0.3, move = { { from = 0.06, to = 0.2, dist = 0.7, dir = "fwd" } },
+}, { chain = 0.3, move = { { from = 0.06, to = 0.2, dist = 1.4, dir = "fwd" } },
 	markers = { hit(0.2, "kael_cross", "RightHand", "contact_cross") } })
 K.m1_3 = clip(0.58, {
 	{ t = 0 },
@@ -128,7 +128,7 @@ K.m1_3 = clip(0.58, {
 	{ t = 0.22, ease = "in2", crouch = 0.58, lean = 18, pyaw = 6, twist = 10, lh = H(1.55, 0.3, -0.35), lp = H(0.3, -0.7, -0.6) },
 	{ t = 0.38, ease = "out2", crouch = 0.42, lean = 9, pyaw = -22, twist = -8, lh = H(1.15, -0.5, 0.85), lp = H(0.2, -0.9, -0.6) },
 	{ t = 0.58, ease = "inout", crouch = 0.35, lean = 6 },
-}, { chain = 0.34, move = { { from = 0.08, to = 0.22, dist = 0.6, dir = "fwd" } },
+}, { chain = 0.34, move = { { from = 0.08, to = 0.22, dist = 1.2, dir = "fwd" } },
 	markers = { hit(0.22, "kael_hook", "LeftHand", "contact_hook") } })
 K.m1_4 = clip(0.78, {
 	{ t = 0 },
@@ -136,7 +136,7 @@ K.m1_4 = clip(0.78, {
 	{ t = 0.26, ease = "in2", crouch = 0.22, lean = 4, pyaw = 10, twist = 12, rh = H(1.9, 0.45, 1.15), rfPitch = 30, rfYaw = -18 },
 	{ t = 0.5, ease = "out2", crouch = 0.38, lean = 8, rh = H(1.2, 0.5, 0.9), rfPitch = 8 },
 	{ t = 0.78, ease = "inout", pyaw = -22, twist = -8, lean = 6, crouch = 0.35, rh = H(0.85, 0.5, 0.8), rfPitch = 0, rfYaw = -38 },
-}, { move = { { from = 0.1, to = 0.28, dist = 1.0, dir = "fwd" } },
+}, { move = { { from = 0.1, to = 0.28, dist = 1.9, dir = "fwd" } },
 	trail = { { from = 0.2, to = 0.4, hand = "RightHand" } },
 	markers = { hit(0.26, "kael_palm", "RightHand", "contact_palm") } })
 
@@ -146,7 +146,7 @@ K.flash = clip(0.42, {
 	{ t = 0.16, ease = "linear", crouch = 0.62, lean = 22, lf = F(1.5, -0.35, 0.25), rf = F(-1.2, 0.55, 0.25) },
 	{ t = 0.3, ease = "out2", crouch = 0.5, lean = 10, lf = F(0.9, -0.35, 0), rf = F(-0.6, 0.55, 0) },
 	{ t = 0.42, ease = "inout" },
-}, { move = { { from = 0.06, to = 0.2, dist = 8.0, dir = "input" } },
+}, { move = { { from = 0.06, to = 0.2, dist = 10.0, dir = "input" } },
 	markers = { { t = 0.06, name = "afterimage" } } })
 K.flash_back = clip(0.42, {
 	{ t = 0 },
@@ -289,7 +289,7 @@ R.m1_1 = clip(0.5, {
 	{ t = 0.17, ease = "in2", lh = H(1.9, -0.25, 0.95), lean = 6, twist = -4 },
 	{ t = 0.32, ease = "out2", lh = H(0.95, -0.4, 1.0), lean = 3, twist = -6 },
 	{ t = 0.5, ease = "inout" },
-}, { chain = 0.3, move = { { from = 0.05, to = 0.18, dist = 0.5, dir = "fwd" } },
+}, { chain = 0.3, move = { { from = 0.05, to = 0.18, dist = 1.2, dir = "fwd" } },
 	markers = { hit(0.17, "ren_jab", "LeftHand", "contact_jab") } })
 R.m1_2 = clip(0.52, {
 	{ t = 0 },
@@ -297,7 +297,7 @@ R.m1_2 = clip(0.52, {
 	{ t = 0.19, ease = "in2", pyaw = 16, twist = 20, lean = 10, rh = H(1.35, 0.45, 1.0), rp = H(0.5, 0.9, -0.2) },
 	{ t = 0.34, ease = "out2", pyaw = -18, twist = -6, lean = 3, rh = H(0.8, 0.35, 0.95), rp = H(0.0, 0.55, -0.85) },
 	{ t = 0.52, ease = "inout", crouch = 0.5 },
-}, { chain = 0.32, move = { { from = 0.06, to = 0.2, dist = 0.5, dir = "fwd" } },
+}, { chain = 0.32, move = { { from = 0.06, to = 0.2, dist = 1.1, dir = "fwd" } },
 	markers = { hit(0.19, "ren_elbow", "RightHand", "contact_elbow") } })
 R.m1_3 = clip(0.66, {
 	{ t = 0 },
@@ -305,7 +305,7 @@ R.m1_3 = clip(0.66, {
 	{ t = 0.29, ease = "in2", pyaw = 40, twist = 30, lean = 8, crouch = 0.5, rh = H(1.6, -0.35, 1.05), rp = H(0.3, 0.8, -0.4), headYaw = 6 },
 	{ t = 0.46, ease = "out2", pyaw = -4, twist = 0, lean = 4, rh = H(1.0, 0.2, 1.0) },
 	{ t = 0.66, ease = "inout", pyaw = -18, twist = -6, lean = 3, rh = H(0.78, 0.35, 0.95), headYaw = 0, rp = H(0.0, 0.55, -0.85) },
-}, { chain = 0.4, move = { { from = 0.1, to = 0.3, dist = 0.6, dir = "fwd" } },
+}, { chain = 0.4, move = { { from = 0.1, to = 0.3, dist = 1.3, dir = "fwd" } },
 	trail = { { from = 0.2, to = 0.4, hand = "RightHand" } },
 	markers = { hit(0.29, "ren_backfist", "RightHand", "contact_backfist") } })
 R.m1_4 = clip(1.2, {
@@ -315,7 +315,7 @@ R.m1_4 = clip(1.2, {
 	{ t = 0.65, ease = "in3", crouch = 0.52, lean = 16, pyaw = 22, twist = 24, rh = H(2.0, 0.45, 1.0), lf = F(1.3, -0.4, 0), rfPitch = 25 },
 	{ t = 0.85, ease = "out2", crouch = 0.62, lean = 12, rh = H(1.7, 0.4, 1.0) },
 	{ t = 1.2, ease = "inout", crouch = 0.5, lean = 3, pyaw = -18, twist = -6, rh = H(0.78, 0.35, 0.95), lf = F(0.55, -0.4, 0), rfPitch = 0 },
-}, { move = { { from = 0.45, to = 0.67, dist = 1.4, dir = "fwd" } }, anticipation = { 0.2, 0.6 },
+}, { move = { { from = 0.45, to = 0.67, dist = 2.2, dir = "fwd" } }, anticipation = { 0.2, 0.6 },
 	trail = { { from = 0.58, to = 0.85, hand = "RightHand" } },
 	markers = { { t = 0.3, name = "anticipation_set" }, hit(0.65, "ren_palm", "RightHand", "contact_palm") } })
 
@@ -384,6 +384,38 @@ do
 end
 
 Clips.Kael, Clips.Ren = K, R
+
+-- SPEED: the keyframes above are authored at "1.0"; the game plays them faster (k < 1 shortens every non-looping clip:
+-- keys, markers, move / lift / window times). Change DEFAULT_SPEED to taste, or call Clips.setSpeed(1) for the authored timing.
+Clips.DEFAULT_SPEED = 0.78
+local function deep(t)
+	if type(t) ~= "table" then return t end
+	local r = {}
+	for k, v in pairs(t) do r[k] = deep(v) end
+	return r
+end
+local ORIG = { Kael = deep(K), Ren = deep(R) }
+local function scaleClip(c, k)
+	c.dur = c.dur * k
+	for _, key in ipairs(c.keys) do key.t = key.t * k end
+	for _, mk in ipairs(c.markers) do mk.t = mk.t * k end
+	if c.chain then c.chain = c.chain * k end
+	for _, list in ipairs({ c.move or {}, c.lift or {}, c.win or {}, c.trail or {} }) do
+		for _, x in ipairs(list) do x.from, x.to = x.from * k, x.to * k end
+	end
+	if c.anticipation then c.anticipation = { c.anticipation[1] * k, c.anticipation[2] * k } end
+end
+function Clips.setSpeed(k)
+	for char, set in pairs(ORIG) do
+		for name, c in pairs(set) do
+			local n = deep(c)
+			if not n.loop and k ~= 1 then scaleClip(n, k) end
+			Clips[char][name] = n
+		end
+	end
+	Clips.speed = k
+end
+Clips.setSpeed(Clips.DEFAULT_SPEED)
 
 -- Engine data for one fighter (what BGEngine.bake wants): every clip becomes a named track.
 function Clips.engineData(char)

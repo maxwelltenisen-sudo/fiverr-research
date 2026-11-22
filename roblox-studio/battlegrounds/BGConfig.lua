@@ -27,14 +27,14 @@ C.guard = {
 C.slip = { counterWindow = 1.1 } -- seconds Kael can press the counter after a clean dodge
 C.openDamageMult = 1.25          -- damage multiplier while "open" (after a missed Arc Breaker / Storm Pierce)
 C.eclipseCounterMult = 1.6       -- stored Eclipse Guard energy multiplies the next Void Counter
-C.combo = { reset = 0.8, buffer = 0.3 }
+C.combo = { reset = 0.8, buffer = 0.45 }   -- a press this long before the chain point still counts (forgiving spam)
 
 -- meter gains
 C.gain = { block = 3, timedBlock = 12, dodge = 10, counterLanded = 6 }
 
 C.char = {
-	Kael = { walk = 7.5, backWalk = 5.5, guardWalk = 3.0, turn = 720 },
-	Ren  = { walk = 6.2, backWalk = 4.6, guardWalk = 2.4, turn = 540 },
+	Kael = { walk = 10.0, backWalk = 7.0, guardWalk = 3.6, turn = 900 },
+	Ren  = { walk = 8.2, backWalk = 5.8, guardWalk = 3.0, turn = 720 },
 }
 
 -- Cooldowns (seconds) for each skill id.
@@ -50,7 +50,7 @@ C.hits = {
 	kael_jab    = { dmg = 4,  range = 3.5, arc = 100, stagger = 0.28, mg = 4 },
 	kael_cross  = { dmg = 5,  range = 3.6, arc = 100, stagger = 0.30, mg = 4 },
 	kael_hook   = { dmg = 6,  range = 3.5, arc = 110, stagger = 0.34, mg = 5 },
-	kael_palm   = { dmg = 8,  range = 3.7, arc = 100, stagger = 0.60, push = 4.5, mg = 7 },   -- final hit pushes
+	kael_palm   = { dmg = 8,  range = 3.7, arc = 100, stagger = 0.60, push = 7.0, mg = 7 },   -- final hit pushes
 	kael_arc    = { dmg = 12, range = 5.4, arc = 90,  stagger = 0.90, stagger1 = 1.25, mg = 10 },
 	kael_sky    = { dmg = 7,  range = 3.7, arc = 100, launch = true, airTime = 1.0, airH = 3.6, mg = 8 },
 	kael_skyfollow = { dmg = 10, mg = 8, stagger = 0.8 },
@@ -62,12 +62,20 @@ C.hits = {
 	ren_jab     = { dmg = 4,  range = 3.4, arc = 100, stagger = 0.28, mg = 4 },
 	ren_elbow   = { dmg = 5,  range = 3.2, arc = 110, stagger = 0.30, mg = 4 },
 	ren_backfist = { dmg = 6, range = 3.6, arc = 120, stagger = 0.34, mg = 5 },
-	ren_palm    = { dmg = 11, range = 3.6, arc = 100, stagger = 0.75, push = 3.8, mg = 8 },
+	ren_palm    = { dmg = 11, range = 3.6, arc = 100, stagger = 0.75, push = 6.0, mg = 8 },
 	ren_pulse   = { dmg = 6,  range = 5.5, range1 = 6.8, arc = 360, push = 6.0, stagger = 0.5, area = true, mg = 8 },
 	ren_counter = { dmg = 12, range = 6.5, arc = 180, stagger = 1.0, push = 3.0, mg = 8 },
 	ren_horizon_blast = { dmg = 28, range = 12, arc = 360, push = 7.0, stagger = 1.3, area = true, unblockable = true, mg = 0 },
 }
 C.horizon = { radius = 12, pullSpeed = 6 }    -- Event Horizon field radius and inward pull (studs per second)
+
+-- Power forms make the fighter hit harder, move faster and swing faster (tempo scales the action clock).
+C.form = {
+	Form1 = { dmg = 1.15, tempo = 1.15, speed = 1.12 },
+	Final = { dmg = 1.4,  tempo = 1.3,  speed = 1.25 },
+}
+-- Hit-stop: both fighters freeze for a few frames on a landed hit (this is most of what makes a punch feel heavy).
+C.hitstop = { light = 0.05, big = 0.095, block = 0.03 }
 
 C.transformInvuln = 1.0
 C.knocked = 0.55                  -- getting-up time after a launch lands

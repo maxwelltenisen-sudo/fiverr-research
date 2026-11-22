@@ -252,6 +252,34 @@ local function handEmitters(id, rate, color)
 	end
 end
 
+-- body aura for power forms: rising sparks + a glow on the torso (rate 0 removes it)
+local function aura(id, rate, color, brightness, range)
+	local torso = rs[id].model:FindFirstChild("UpperTorso")
+	if not torso then return end
+	local e, l = torso:FindFirstChild("BGAura"), torso:FindFirstChild("BGGlow")
+	if rate <= 0 then
+		if e then e:Destroy() end
+		if l then l:Destroy() end
+		return
+	end
+	if not e then
+		e = Instance.new("ParticleEmitter")
+		e.Name = "BGAura"
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.LightEmission = 1; e.Lifetime = NumberRange.new(0.5, 0.9); e.Speed = NumberRange.new(3, 7)
+		e.EmissionDirection = Enum.NormalId.Top; e.SpreadAngle = Vector2.new(35, 35)
+		e.Size = NumberSequence.new(0.35, 0); e.Transparency = NumberSequence.new(0.1, 1)
+		e.Parent = torso
+	end
+	if not l then
+		l = Instance.new("PointLight")
+		l.Name = "BGGlow"
+		l.Parent = torso
+	end
+	e.Rate, e.Color = rate, ColorSequence.new(color)
+	l.Color, l.Brightness, l.Range = color, brightness, range
+end
+
 local function setSeams(deco, color, transparency, material)
 	for _, p in ipairs(deco.Seam) do
 		p.Color, p.Transparency = color, transparency
@@ -269,18 +297,18 @@ local function applyForm(id, form, prev)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 1 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
 			for _, p in ipairs(d.Bracer) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
-			setHighlight(id, false); handEmitters(id, 0, CYAN)
+			setHighlight(id, false); handEmitters(id, 0, CYAN); aura(id, 0)
 		elseif form == "Form1" then
 			setSeams(d, Color3.fromRGB(120, 235, 255), 0)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 0 end        -- scarf trails slightly longer
-			setHighlight(id, false); handEmitters(id, 7, CYAN)
+			setHighlight(id, false); handEmitters(id, 7, CYAN); aura(id, 22, CYAN, 1.6, 14)
 		else
 			setSeams(d, Color3.fromRGB(205, 240, 255), 0)
 			for _, p in ipairs(d.PowerSegment) do p.Transparency = 0 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = Color3.fromRGB(215, 238, 255), Enum.Material.Neon end   -- blue-white eyes
 			for _, p in ipairs(d.Bracer) do p.Color, p.Material = Color3.fromRGB(110, 130, 170), Enum.Material.Neon end -- brighter forearm guards
 			setHighlight(id, true, Color3.fromRGB(170, 225, 255), 0.5)
-			handEmitters(id, 16, Color3.fromRGB(190, 230, 255))
+			handEmitters(id, 16, Color3.fromRGB(190, 230, 255)); aura(id, 55, Color3.fromRGB(190, 230, 255), 3, 22)
 		end
 	else
 		if form == "Base" then
@@ -289,13 +317,15 @@ local function applyForm(id, form, prev)
 			for _, p in ipairs(d.Accent) do p.Transparency = 1 end
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
 			for _, p in ipairs(d.Hair) do p.Color, p.Material = d.base[p].Color, d.base[p].Material end
-			setHighlight(id, false)
+			setHighlight(id, false); aura(id, 0)
 		elseif form == "Form1" then
 			setSeams(d, VIOLET, 0.05)                       -- violet lines illuminate across the bracers
 			for _, p in ipairs(d.Lining) do p.Transparency = 0.1 end   -- coat lining glows during turns
 			for _, p in ipairs(d.Accent) do p.Transparency = 1 end
+			aura(id, 20, VIOLET, 1.5, 14)
 		else
 			setSeams(d, Color3.fromRGB(200, 150, 255), 0)
+			aura(id, 50, Color3.fromRGB(205, 160, 255), 2.8, 22)
 			for _, p in ipairs(d.Lining) do p.Transparency = 0.05 end
 			for _, p in ipairs(d.Accent) do p.Transparency = 0.78 end   -- layered translucent accents on the bracers
 			for _, p in ipairs(d.Eye) do p.Color, p.Material = Color3.fromRGB(175, 95, 255), Enum.Material.Neon end
@@ -476,6 +506,7 @@ local function blendTimeFor(clip)
 	return 0.12
 end
 
+local FASTCLIPS = { flash = true, flash_back = true, storm = true, arc = true, thunder = true, m1_4 = true, m1_2 = true, sky = true, void_counter = true, counter = true }
 local trailSets = {}
 local function updateTrails(r, meta, t)
 	local want = {}
@@ -528,6 +559,10 @@ RunService:BindToRenderStep("BGPose", Enum.RenderPriority.Camera.Value - 1, func
 			for jn, rt in pairs(out.rot) do r.motors[jn].Transform = rt end
 			r.cloth:update(world * out.cf.UpperTorso, dt)
 			updateTrails(r, meta, t)
+			if r.form ~= "Base" and FASTCLIPS[s.clip] and os.clock() - (r.lastGhost or 0) > 0.07 then
+				r.lastGhost = os.clock()
+				ghost(r.model, colorOf(id))     -- speed afterimages in power forms
+			end
 			if s.form ~= r.form then
 				local prev = r.form
 				r.form = s.form

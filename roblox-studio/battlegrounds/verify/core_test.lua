@@ -1,6 +1,7 @@
 local function readfile(p) local f = assert(io.open(p)); local s = f:read("a"); f:close(); return s end
 local Config = load(readfile("../BGConfig.lua"))()
 local Clips = load(readfile("../BGClips.lua"))()
+Clips.setSpeed(1)   -- tests are written against the authored timing
 local Core = load(readfile("../BGCore.lua"))()
 local fails, checks = 0, 0
 local function check(cond, msg)
@@ -183,7 +184,7 @@ do
 	local w3 = new(6.3)
 	w3.f.Purple.form = "Form1"; w3.f.Purple.meter = 75
 	w3:input(P, "skill", 2); run(w3, 0.7)
-	check(w3.f.Blue.hp == 94, "Gravity Pulse range grows in Rift Mode (hits at 6.3)")
+	check(w3.f.Blue.hp < 100, "Gravity Pulse range grows in Rift Mode (hits at 6.3); form damage x1.15 (hp " .. string.format("%.2f", w3.f.Blue.hp) .. ")")
 	local w3b = new(6.3)
 	w3b:input(P, "skill", 2); run(w3b, 0.7)
 	check(w3b.f.Blue.hp == 100, "...but not in Base")
@@ -273,5 +274,29 @@ do
 	local contacts = 0
 	for _, char in ipairs({ "Kael", "Ren" }) do for name, c in pairs(Clips[char]) do if name ~= "bases" then for _, mk in ipairs(c.markers) do if mk.op == "hit" then contacts = contacts + 1 end end end end end
 	check(contacts >= 14, "contact markers present (" .. contacts .. ")")
+end
+print("11. Game speed, hit-stop, form tempo and damage")
+do
+	Clips.setSpeed(Clips.DEFAULT_SPEED)
+	check(math.abs(Clips.Kael.m1_1.dur - 0.42 * Clips.DEFAULT_SPEED) < 1e-6, "clips are played at " .. Clips.DEFAULT_SPEED .. "x duration")
+	local w = new(3.0)
+	for i = 1, 4 do w:input(B, "m1"); run(w, 0.2) end
+	run(w, 1.0)
+	check(#events(w, "hit") == 4, "four-hit combo lands with 0.2 s between presses at game speed")
+	local w2 = new(3.0)
+	w2:input(B, "m1")
+	local t0, frozen = nil, 0
+	for i = 1, 60 do
+		local before = w2.f.Blue.act and w2.f.Blue.act.t
+		w2:update(1 / 60)
+		if w2.freeze > 0 and before and w2.f.Blue.act and w2.f.Blue.act.t == before then frozen = frozen + 1 end
+	end
+	check(frozen >= 2, "hit-stop holds the attacker's clip for several frames (" .. frozen .. ")")
+	local w3 = new(3.0)
+	w3.f.Blue.form = "Form1"; w3.f.Blue.meter = 80
+	w3:input(B, "m1"); run(w3, 0.4)
+	check(math.abs((100 - w3.f.Purple.hp) - 4 * 1.15) < 1e-6, "Charged Mode adds x1.15 damage")
+	check(math.abs(w3:tempo(w3.f.Blue) - 1.15) < 1e-9, "Charged Mode tempo 1.15")
+	Clips.setSpeed(1)
 end
 print(string.format("\n%d checks, %d failed (final)", checks, fails))
