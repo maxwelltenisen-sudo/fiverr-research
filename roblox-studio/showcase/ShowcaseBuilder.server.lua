@@ -187,6 +187,22 @@ local function newRig(name, colors)
 	local hum = m:FindFirstChildOfClass("Humanoid")
 	hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	pcall(function() hum.EvaluateStateMachine = false end)
+	-- Current Roblox rigs ship AnimationConstraints (no Motor6Ds). The Director drives Motor6D.Transform,
+	-- so replace each constraint with an equivalent Motor6D (same parts, same C0/C1).
+	for _, c in ipairs(m:GetDescendants()) do
+		if c:IsA("AnimationConstraint") and c.Attachment0 and c.Attachment1 then
+			local mot = Instance.new("Motor6D")
+			mot.Name = c.Name
+			mot.Part0, mot.Part1 = c.Attachment0.Parent, c.Attachment1.Parent
+			mot.C0, mot.C1 = c.Attachment0.CFrame, c.Attachment1.CFrame
+			local p1 = mot.Part1
+			c:Destroy()
+			mot.Parent = p1
+		end
+	end
+	for _, c in ipairs(m:GetDescendants()) do
+		if c:IsA("BallSocketConstraint") or c:IsA("HingeConstraint") then c:Destroy() end
+	end
 	return m
 end
 
