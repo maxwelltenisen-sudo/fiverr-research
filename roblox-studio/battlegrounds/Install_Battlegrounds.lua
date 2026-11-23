@@ -2125,7 +2125,7 @@ put(RS, "ModuleScript", "BGDuel", [====[
 -- Every state (glasses, spear, chain, tiles, lighting) is a pure function of the frame, so any chapter starts correctly when selected.
 --   Axes: +X is screen-right. Gojo faces -X (toward the gate), Toji faces +X. Heights: gy = ground height under the fighter.
 local D = {}
-D.fps, D.duelFrames, D.frames = 30, 7200, 7800
+D.fps, D.duelFrames, D.frames = 30, 7200, 10290
 D.duration = D.frames / D.fps
 
 local function sec(m, s) return math.floor((m * 60 + s) * D.fps) end
@@ -2138,7 +2138,10 @@ D.chapters = {
 	{ id = 6, name = "Red",                   f0 = sec(2, 20),  f1 = sec(2, 55),  q = "Can he be hit now?" },
 	{ id = 7, name = "Toji's full arsenal",   f0 = sec(2, 55),  f1 = sec(3, 35),  q = "Can speed and steel win?" },
 	{ id = 8, name = "Hollow Purple",         f0 = sec(3, 35),  f1 = sec(4, 0),   q = "What happens when both forces meet?" },
-	{ id = 9, name = "Years later - Unlimited Void (epilogue)", f0 = sec(4, 0), f1 = sec(4, 20), q = "What does the strongest see?", epilogue = true },
+	{ id = 9,  name = "Adult Gojo: Infinity, Maximum Output Blue, movement", f0 = 7200, f1 = 8400, q = "What does the strongest do with a free hand?", adult = true },
+	{ id = 10, name = "Unlimited Void",                     f0 = 8400, f1 = 9300, q = "What does it feel like to be understood all at once?", adult = true },
+	{ id = 11, name = "Unlimited Void: the 0.2-second application", f0 = 9300, f1 = 9540, q = "How little time is enough?", adult = true },
+	{ id = 12, name = "Shibuya Toji: Playful Cloud",        f0 = 9540, f1 = 10290, q = "Who is in control of the body?", shibuya = true },
 }
 function D.chapterAt(frame) local c = D.chapters[1] for _, ch in ipairs(D.chapters) do if frame >= ch.f0 then c = ch end end return c end
 
@@ -2176,9 +2179,9 @@ G.pointHold = { pyaw = -22, twist = -10, lean = 4, rh = H(1.75, 0.2, 0.6) }
 G.dodgeA = { lean = -12, roll = 6, pyaw = -30, headYaw = 6, rh = H(0.1, 0.7, -0.9) }                                 -- minimal lean away
 G.dodgeB = { lean = 8, roll = -6, pyaw = 10, headYaw = -8 }
 G.hit = { lean = -22, crouch = 0.2, headPitch = -16, rh = H(0.3, 1.0, 0.0), lh = H(0.3, -1.0, 0.0), rp = H(0.0, 0.9, 0.0), lp = H(0.0, -0.9, 0.0) }
-G.down = { crouch = 1.45, lean = -16, pyaw = -14, headPitch = 12, lh = H(0.95, -0.55, -1.7), rh = H(0.4, 0.7, -1.2), rf = F(-0.3, 0.7), lf = F(0.7, -0.5) }  -- seated against the floor, left hand flat on a tile
-G.breathe1 = { lean = -14, crouch = 1.42 }
-G.breathe2 = { lean = -17, crouch = 1.48 }
+G.down = { crouch = 1.2, lean = -16, pyaw = -14, headPitch = 12, lh = H(0.95, -0.55, -1.7), rh = H(0.4, 0.7, -1.2), rf = F(-0.3, 0.7), lf = F(0.7, -0.5) }  -- seated against the floor, left hand flat on a tile
+G.breathe1 = { lean = -14, crouch = 1.18 }
+G.breathe2 = { lean = -17, crouch = 1.24 }
 G.rise1 = { crouch = 1.2, lean = 6, headPitch = 6, lh = H(0.9, -0.55, -1.4), rh = H(0.5, 0.7, -1.0) }
 G.rise2 = { crouch = 0.4, lean = 4, headPitch = 0, lh = H(0.1, -0.72, -1.0), rh = H(0.1, 0.72, -1.0) }
 G.red = { pyaw = -30, twist = -14, lean = -4, rh = H(1.6, 0.15, 0.7), rp = H(0.3, 0.4, 0.1) }                         -- palm out
@@ -2378,12 +2381,12 @@ Gj:add(1000, G.tilt)
 -- attempt 3: Toji changes direction midway and watches when Gojo turns
 Tj:add(1040, J.coil, { x = 3.0, ease = "in2" })
 Tj:add(1046, J.dash, { x = 3.0, ease = "in2" })
-Tj:add(1050, J.dash, { x = 5.2, z = 1.8, ease = "linear" })                   -- feints to the near side
-Tj:add(1055, J.strikeLoad, { x = 5.6, z = 1.8 })
+Tj:add(1050, J.dash, { x = 4.6, z = 2.8, ease = "linear" })                   -- feints to the near side
+Tj:add(1055, J.strikeLoad, { x = 5.0, z = 2.8 })
 Tj:add(1058, J.dash, { x = 7.8, z = -2.4, yaw = 20, ease = "linear" })        -- cuts back across behind Gojo's head
 Tj:add(1066, J.strike, { x = 8.4, z = -2.4, yaw = 20 })
 Tj:add(1100, J.watchHand, { x = 7.6, z = -2.0, yaw = 20 })
-Tj:add(1180, J.watchHand, { x = 6.4, z = -0.8, yaw = 10 })
+Tj:add(1180, J.watchHand, { x = 6.4, z = -2.3, yaw = 10 })
 Tj:add(1260, J.settle, { x = 5.0, z = -0.4, yaw = 0 })
 Tj:add(1380, J.settle, { x = 2.4, z = 0.2 })
 Tj:add(1499, J.loose, { x = 1.0, z = 0.2 })
@@ -2413,9 +2416,9 @@ Tj:add(1590, { J.crouchLow, { roll = 8 } }, { x = 0.6, z = 0.4 })              -
 Tj:add(1640, J.crouchLow, { x = -1.6, z = 0.4, ease = "linear" })              -- dragged toward the point; slab arrives
 Tj:add(1690, { J.coil, { crouch = 0.9 } }, { x = -2.2 })                       -- he steps onto the slab
 Tj:add(1700, J.dash, { x = -1.0, gy = 0.4, ease = "in2" })
-Tj:add(1708, J.air, { x = 3.0, gy = 2.3, ease = "linear" })                    -- rides the tilting slab upward
-Tj:add(1722, J.air, { x = 8.0, gy = 4.4, ease = "linear" })                    -- over Gojo
-Tj:add(1736, J.airSpear, { x = 11.2, gy = 4.0, ease = "in2" })
+Tj:add(1708, J.air, { x = 3.0, gy = 2.3, ease = "linear", lf = F(0.4, -0.4, 0.8), rf = F(-0.4, 0.5, 0.8) })                    -- rides the tilting slab upward
+Tj:add(1722, J.air, { x = 8.0, gy = 4.4, ease = "linear", lf = F(0.5, -0.4, 0.9), rf = F(-0.3, 0.5, 0.9) })                    -- over Gojo
+Tj:add(1736, J.airSpear, { x = 11.2, gy = 4.0, ease = "in2", lf = F(0.6, -0.4, 0.6), rf = F(-0.3, 0.5, 0.5) })
 Tj:add(1744, J.land, { x = 11.8, gy = 1.9, ease = "out2" })                    -- lands on the stair
 Tj:add(1770, J.settle, { x = 12.0 })
 Tj:add(1900, J.loose, { x = 13.5 })
@@ -2526,10 +2529,10 @@ Tj:add(5486, J.sweep, { x = 3.8, ease = "out2" })
 Tj:add(5530, J.settle, { x = 3.6 })
 Tj:add(5680, J.dash, { x = 8.0 })
 Tj:add(5686, J.strike, { x = 6.6, ease = "in2" })
-Tj:add(5700, J.land, { x = 5.0 })
-Tj:add(5780, J.pull, { x = 5.0 })                                               -- exchange 2: sudden return interrupts the approach
-Tj:add(5800, J.pull, { x = 4.0, ease = "in2" })
-Tj:add(5812, J.spearHold, { x = 4.0 })
+Tj:add(5700, J.land, { x = 6.8 })
+Tj:add(5780, J.pull, { x = 6.8 })                                               -- exchange 2: sudden return interrupts the approach
+Tj:add(5800, J.pull, { x = 6.2, ease = "in2" })
+Tj:add(5812, J.spearHold, { x = 6.2 })
 Tj:add(5950, J.coil, { x = 3.8, ease = "in2" })
 Tj:add(5956, J.air, { x = 7.0, gy = 2.0, ease = "in2" })                         -- exchange 3: airborne crossing, the chain divides the frame
 Tj:add(5966, J.airSpear, { x = 12.0, gy = 2.6, z = -0.3, ease = "linear" })
@@ -2547,8 +2550,8 @@ Gj:add(5474, G.dodgeA, { x = 6.0 })
 Gj:add(5486, G.sidestep, { x = 7.8, z = -0.5, ease = "out2" })
 Gj:add(5560, { G.watch, { headYaw = -20 } }, { x = 8.0 })
 Gj:add(5640, G.stand, { x = 6.4, z = 0.0 })                                       -- steps in: the return interrupts him
-Gj:add(5680, G.run, { x = 3.8 })
-Gj:add(5800, G.hit, { x = 4.8, ease = "out2" })
+Gj:add(5680, G.run, { x = 3.2 })
+Gj:add(5800, G.hit, { x = 3.6, ease = "out2" })
 Gj:add(5840, G.sidestep, { x = 7.2 })
 Gj:add(5950, { G.watch, { headYaw = -16 } }, { x = 7.0 })
 Gj:add(5976, G.dodgeA, { x = 9.4, ease = "out2" })
@@ -2578,13 +2581,70 @@ Tj:add(6960, J.stagger, { x = 2.0, ease = "out2" })
 Tj:add(7100, J.settle, { x = 1.4 })
 Tj:add(7199, J.loose, { x = 1.4 })
 
----------------------------------------------------------------------------------------------- EPILOGUE (7200-7799): adult Gojo, blindfold, Unlimited Void
+---------------------------------------------------------------------------------------------- ADULT GOJO CHAPTERS (7200-9539) and SHIBUYA TOJI (9540-10289)
+G.sign = { crouch = 0.1, lean = 2, rh = H(1.1, 0.15, 0.9), lh = H(1.0, -0.2, 0.85), rp = H(0.2, 0.4, 0.2), lp = H(0.2, -0.4, 0.2), pyaw = -10 }     -- the hand sign for the domain
+G.uncover = { lean = -2, rh = H(0.5, 0.4, 1.5), rp = H(0.0, 0.5, 0.6), headPitch = -4 }                                                              -- fingers at the blindfold
+G.blink = { crouch = 0.3, lean = 6 }
+J.slack = { crouch = 0.15, lean = 12, headPitch = 22, rh = H(0.1, 0.8, -1.2), lh = H(0.1, -0.8, -1.2) }                                               -- body without its owner
+J.takeover = { crouch = 0.3, lean = 0, headPitch = -6, rh = H(0.5, 0.7, -0.4), lh = H(0.5, -0.7, -0.4) }
+J.cloud = { crouch = 0.55, lean = 10, pyaw = -14, rh = H(1.0, 0.5, 0.2), lh = H(0.7, -0.6, 0.1) }                                                     -- Playful Cloud held in two hands
+J.cloudSwing = { crouch = 0.6, lean = 22, pyaw = 26, twist = 28, rh = H(1.9, 0.5, 0.4), lh = H(1.3, -0.4, 0.3) }
+J.cloudWind = { crouch = 0.7, lean = 8, pyaw = -34, twist = -26, rh = H(0.4, 0.9, 0.4), lh = H(0.5, -0.4, 0.3) }
+-- Gojo (adult): 7200 infinity filter / 7500 maximum-output Blue / 7950 spatial movement / 8400 unlimited void / 9300 the 0.2 s application
 Gj:add(7200, G.stand, { x = 6.0, z = 0.0, gy = 0, yaw = 0 })
-Gj:add(7400, { G.stand, { headPitch = -4 } })
-Gj:add(7500, { G.watch })
-Gj:add(7799, { G.stand })
-Tj:add(7200, J.loose, { x = -60.0, z = -60.0 })                                    -- Toji is not in the epilogue (parked far away)
-Tj:add(7799, J.loose, { x = -60.0, z = -60.0 })
+Gj:add(7300, { G.watch, { headYaw = -16 } })
+Gj:add(7344, { G.tilt })                                                      -- the stone stops; the leaf already passed through
+Gj:add(7440, G.shift)
+Gj:add(7500, G.stand)
+Gj:add(7560, G.pointHold, { ease = "out2" })
+Gj:add(7680, G.pointHold)
+Gj:add(7760, { G.pointHold, { lean = -6 } })
+Gj:add(7900, G.stand, { ease = "inout" })
+Gj:add(7980, G.stand, { x = 6.0 })
+Gj:add(8040, G.blink, { x = 6.0, ease = "in2" })                              -- short reposition: three studs in four frames
+Gj:add(8044, G.blink, { x = 9.0, ease = "out2" })
+Gj:add(8100, G.stand, { x = 9.0 })
+Gj:add(8140, G.stand, { x = -16.0, z = 0.0, lf = F(0.3, -0.45, 0), rf = F(-0.3, 0.55, 0) })     -- long-distance: departs at the gate ...
+Gj:add(8200, G.stand, { x = -16.0 })
+Gj:add(8203, G.blink, { x = 26.0, gy = 3.2, lf = F(0.3, -0.45, 0), rf = F(-0.3, 0.55, 0) })    -- ... arrives on the walkway
+Gj:add(8300, G.stand, { x = 26.0 })
+Gj:add(8399, G.stand, { x = 26.0 })
+Gj:add(8400, G.dodgeA, { x = 6.0, z = 0.0, gy = 0, lf = F(0.2, -0.45, 0), rf = F(-0.2, 0.5, 0) })   -- unlimited void: the action is already underway
+Gj:add(8440, G.dodgeB, { x = 6.0 })
+Gj:add(8480, G.uncover, { ease = "out2" })
+Gj:add(8540, G.uncover)
+Gj:add(8570, G.sign, { ease = "out2" })
+Gj:add(9040, G.sign)
+Gj:add(9060, G.stand, { ease = "out2" })                                       -- the domain releases
+Gj:add(9200, { G.uncover, { rh = H(0.6, 0.4, 1.3) } }, { ease = "inout" })
+Gj:add(9299, G.stand)
+Gj:add(9300, G.stand, { x = 6.0 })
+Gj:add(9390, G.stand)
+Gj:add(9412, G.sign, { ease = "in2" })                                         -- the 0.2 s application: anticipation, six frames, aftermath
+Gj:add(9426, G.sign)
+Gj:add(9440, G.stand, { ease = "out2" })
+Gj:add(9539, G.tilt)
+Gj:add(9540, G.stand, { x = -70.0, z = -60.0 })                                -- parked while Shibuya Toji has the stage
+Gj:add(10289, G.stand, { x = -70.0, z = -60.0 })
+Tj:add(7200, J.loose, { x = -60.0, z = -60.0 })                                -- parked through the adult chapters
+Tj:add(9539, J.loose, { x = -60.0, z = -60.0 })
+Tj:add(9540, J.slack, { x = -12.0, z = 0.0 })                                  -- Shibuya: the body stands slack, mist gathers
+Tj:add(9660, J.slack, { x = -12.0 })
+Tj:add(9690, J.takeover, { x = -12.0, ease = "out2" })                          -- the soul takes control: head lifts, eyes snap open
+Tj:add(9750, J.cloud, { x = -12.0 })
+Tj:add(9800, J.coil, { x = -12.0, ease = "in2" })
+Tj:add(9806, J.dash, { x = -11.0, ease = "in3" })
+Tj:add(9814, J.cloudSwing, { x = 3.2, z = 0.3, ease = "linear" })              -- speed across the water
+Tj:add(9820, J.cloudSwing, { x = 3.6, ease = "out3" })
+Tj:add(9880, J.cloud, { x = 3.0 })
+Tj:add(9960, J.cloudWind, { x = 3.0, ease = "in2" })
+Tj:add(9968, J.cloudSwing, { x = 3.6, z = 0.0, ease = "in3" })
+Tj:add(10040, J.cloud, { x = 3.0 })
+Tj:add(10100, J.dash, { x = -4.0, z = 1.0 })
+Tj:add(10106, J.air, { x = 0.0, z = 0.6, gy = 1.6, ease = "linear" })
+Tj:add(10116, J.cloudSwing, { x = 6.0, z = 0.0, gy = 0.0, ease = "in3" })
+Tj:add(10200, J.cloud, { x = 5.0 })
+Tj:add(10289, J.loose, { x = 5.0 })
 
 ---------------------------------------------------------------------------------------------- contacts (solved by BGEngine.bake)
 D.contacts = {
@@ -2597,7 +2657,7 @@ D.eyes = {
 	Blue = { { f = 0, x = 0, y = 0 }, { f = 50, x = 0, y = 0 }, { f = 58, x = -0.075, y = 0 }, { f = 300, x = -0.075, y = 0 }, { f = 1058, x = 0.07, y = 0 },
 		{ f = 1400, x = -0.05, y = 0 }, { f = 2680, x = -0.075, y = 0.02 }, { f = 3800, x = 0, y = 0 }, { f = 3880, x = 0.0, y = 0 },
 		{ f = 4330, x = -0.075, y = 0 }, { f = 7000, x = 0, y = 0 }, { f = 7199, x = 0, y = -0.03 } },
-	Purple = { { f = 0, x = 0, y = 0 }, { f = 4040, x = 0, y = 0 }, { f = 4052, x = 0.06, y = 0 }, { f = 4150, x = 0, y = 0 } },
+	Purple = { { f = 0, x = 0, y = 0 }, { f = 4040, x = 0, y = 0 }, { f = 4052, x = 0.06, y = 0 }, { f = 4150, x = 0, y = 0 }, { f = 9660, x = 0, y = 0.08 }, { f = 9692, x = 0, y = 0 } },
 }
 
 ---------------------------------------------------------------------------------------------- camera
@@ -2690,17 +2750,42 @@ D.camera = {
 	cam(7121, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "8 Gojo's expression" }),
 	cam(7199, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 18),
 	-- epilogue
-	cam(7200, { 6.0, 3.4, 14.0 }, { 6.0, 3.0, 0 }, 42, { cut = true, name = "9 Years later" }),
-	cam(7400, { 6.0, 3.4, 11.0 }, { 6.0, 3.0, 0 }, 38),
-	cam(7401, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 one eye revealed" }),
-	cam(7520, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
-	cam(7521, { 6.0, 3.6, 16.0 }, { 6.0, 3.0, 0 }, 50, { cut = true, name = "9 the field" }),
-	cam(7690, { 6.0, 3.6, 13.0 }, { 6.0, 3.0, 0 }, 46),
-	cam(7691, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 same eye framing as the awakening" }),
-	cam(7799, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
 }
+local function addCams(list) for _, c in ipairs(list) do table.insert(D.camera, c) end end
+addCams({
+	cam(2440, rel("Purple", -1.5, -0.2, 2.4), rel("Purple", -0.8, -0.3, 0), 20, { cut = true, name = "4 the curse opens its mouth" }),
+	cam(2496, { 21.0, 5.4, 14.0 }, { 22.5, 4.4, 0 }, 42, { cut = true, name = "4 walkway (spear out)" }),
+	cam(7200, { 6.0, 3.4, 13.0 }, { 6.0, 3.0, 0 }, 40, { cut = true, name = "9 Infinity filters two objects" }),
+	cam(7335, rel("Blue", -1.6, -0.2, 2.0), rel("Blue", -0.8, 0.0, 0), 24, { cut = true, name = "9 the stone stops" }),
+	cam(7420, { 6.0, 3.4, 13.0 }, { 6.0, 3.0, 0 }, 40, { cut = true }),
+	cam(7500, { 0.0, 7.0, 32.0 }, { 0.0, 2.0, 0 }, 60, { cut = true, name = "9 Maximum Output Blue (wide)" }),
+	cam(7899, { 0.0, 7.0, 32.0 }, { 0.0, 2.0, 0 }, 60),
+	cam(7900, { 7.0, 3.4, 13.0 }, { 7.0, 3.0, 0 }, 40, { cut = true, name = "9 reposition" }),
+	cam(8110, { 5.0, 7.0, 44.0 }, { 5.0, 3.0, 0 }, 56, { cut = true, name = "9 long transport: gate to walkway" }),
+	cam(8399, { 5.0, 7.0, 44.0 }, { 5.0, 3.0, 0 }, 56),
+	cam(8400, { 6.0, 3.6, 14.0 }, { 7.0, 3.0, 0 }, 40, { cut = true, name = "10 Unlimited Void: action underway" }),
+	cam(8480, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "10 uncovering his eyes" }),
+	cam(8566, rel("Blue", -1.0, -0.8, -2.6), rel("Blue", -0.3, -0.7, 0), 22, { cut = true, name = "10 the hand sign" }),
+	cam(8620, { 8.0, 9.0, 36.0 }, { 8.0, 3.0, 0 }, 55, { cut = true, name = "10 the barrier closes (wide)" }),
+	cam(8700, { 6.0, 3.6, 11.0 }, { 8.0, 3.2, 0 }, 40, { cut = true, name = "10 inside the domain" }),
+	cam(8830, { 5.0, 3.0, 8.0 }, { 6.0, 3.6, 0 }, 34),
+	cam(8900, { 10.4, 3.4, 0.4 }, { 6.0, 3.4, 0 }, 50, { cut = true, name = "10 the opponent's view" }),
+	cam(9050, { 8.0, 6.0, 34.0 }, { 8.0, 3.0, 0 }, 55, { cut = true, name = "10 release (outside)" }),
+	cam(9200, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "10 the same eye framing" }),
+	cam(9300, { 6.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { cut = true, name = "11 the 0.2 s application: setup" }),
+	cam(9395, rel("Blue", -1.0, -0.8, -2.6), rel("Blue", -0.3, -0.7, 0), 22, { cut = true, name = "11 hands" }),
+	cam(9418, { 8.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { cut = true, name = "11 six frames" }),
+	cam(9432, { 8.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { name = "11 aftermath" }),
+	cam(9540, { -4.0, 4.0, 22.0 }, { -2.0, 2.0, 0 }, 50, { cut = true, name = "12 Shibuya: the body" }),
+	cam(9760, rel("Purple", 0.5, 0.1, 2.2), rel("Purple", 0, 0, 0), 22, { cut = true, name = "12 eyes snap open" }),
+	cam(9790, { -2.0, 4.0, 24.0 }, { 0.0, 2.0, 0 }, 52, { cut = true, name = "12 speed across the water" }),
+	cam(9960, { 2.0, 3.6, 16.0 }, { 3.5, 2.6, 0 }, 44, { cut = true, name = "12 Playful Cloud: sweep" }),
+	cam(10095, { 0.0, 4.2, 22.0 }, { 1.5, 2.4, 0 }, 50, { cut = true, name = "12 leap" }),
+	cam(10200, { 3.0, 3.6, 16.0 }, { 5.0, 2.6, 0 }, 44, { cut = true, name = "12 finish" }),
+})
+table.sort(D.camera, function(a, b) return a.f < b.f end)
 D.shake = { { f = 159, amp = 0.35, frames = 5 }, { f = 1744, amp = 0.3, frames = 5 }, { f = 2722, amp = 0.35, frames = 5 }, { f = 4342, amp = 0.4, frames = 6 }, { f = 6900, amp = 0.6, frames = 8 } }
-D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 } }      -- the first Infinity stop, and the beat before Purple
+D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 }, { f0 = 9414, f1 = 9440, scale = 0.2 } }      -- the first Infinity stop, and the beat before Purple
 
 ---------------------------------------------------------------------------------------------- state as functions of frame
 function D.glassesState(f)       -- "face" | "flying" | "step" | "settling" | "settled" | "none"
@@ -2711,7 +2796,7 @@ function D.glassesState(f)       -- "face" | "flying" | "step" | "settling" | "s
 	if f < 7125 then return "settling" end
 	return "settled"
 end
-function D.spearVisible(f) return (f >= 2490 and f < 3460) or (f >= 4330 and f < 7200) end
+function D.spearVisible(f) return (f >= 2494 and f < 3460) or (f >= 4330 and f < 7200) end
 function D.chainVisible(f) return f >= 5340 and f < 6449 end
 function D.curseUncoiled(f) return f >= 2450 and f < 3460 or f >= 5300 and f < 6449 end
 
@@ -2727,21 +2812,29 @@ D.fx = {
 	red = { f0 = 4342, f1 = 4372, point = { -5.2, 2.0, 0.3 } },
 	chain = { f0 = 5340, f1 = 6449 },
 	purple = { blue0 = 6530, red0 = 6600, merge = 6820, release = 6900, beam1 = 7010, laneZ = 0.0 },
-	void = { f0 = 7440, f1 = 7799 },
+	filter = { leaf = { f0 = 7230, f1 = 7330 }, stone = { f0 = 7300, f1 = 7480 } },
+	maxBlue = { f0 = 7560, f1 = 7900, point = { 0.0, 7.0, 0.0 }, radius = 26 },
+	blink = { { f = 8040, to = { 9.0, 0 } }, { f = 8203, to = { 26.0, 3.2 } } },
+	curtain = { f0 = 8240, f1 = 8399 },
+	emerge = { f0 = 2440, f1 = 2494 },
+	uv = { f0 = 8400, closeStart = 8620, closeEnd = 8700, inside0 = 8700, opp0 = 8900, release = 9050, restored = 9200 },
+	uv02 = { f = 9420, frames = 6 },
+	water = { f0 = 9540, f1 = 10289 },
+	construct = { { f0 = 8400, f1 = 9300, x = 10.0 }, { f0 = 9300, f1 = 9540, x = 10.5 }, { f0 = 9740, f1 = 10289, x = 9.0 } },
 }
 D.sound = {  -- cues (ids in D.soundIds; blank = silence). music is a separate envelope
 	{ f = 30, cue = "glass_shadow" }, { f = 158, cue = "burst" }, { f = 625, cue = "pebble_stop" }, { f = 909, cue = "infinity_stop" },
 	{ f = 1560, cue = "blue" }, { f = 1745, cue = "land" }, { f = 2716, cue = "spear_fold" }, { f = 4045, cue = "footstep" },
-	{ f = 4342, cue = "red" }, { f = 5474, cue = "chain" }, { f = 6900, cue = "purple" }, { f = 7125, cue = "glasses" }, { f = 7440, cue = "void" },
+	{ f = 4342, cue = "red" }, { f = 2444, cue = "curse_open" }, { f = 7340, cue = "infinity_stop" }, { f = 7560, cue = "blue" }, { f = 8203, cue = "transport" }, { f = 8620, cue = "barrier" }, { f = 8700, cue = "void_in" }, { f = 9050, cue = "void_out" }, { f = 9420, cue = "void_flash" }, { f = 9692, cue = "seance" }, { f = 9814, cue = "splash" }, { f = 5474, cue = "chain" }, { f = 6900, cue = "purple" }, { f = 7125, cue = "glasses" }, { f = 7440, cue = "void" },
 }
 D.soundIds = {
 	burst = "rbxasset://sounds/swordlunge.wav", land = "rbxasset://sounds/impact_water.mp3", spear_fold = "rbxasset://sounds/impact_explosion_03.mp3",
 	blue = "rbxasset://sounds/bass.mp3", red = "rbxasset://sounds/swordslash.wav", chain = "rbxasset://sounds/swordslash.wav", purple = "rbxasset://sounds/impact_explosion_03.mp3",
 	footstep = "rbxasset://sounds/snap.mp3", infinity_stop = "rbxasset://sounds/electronicpingshort.wav", pebble_stop = "rbxasset://sounds/electronicpingshort.wav",
-	glasses = "rbxasset://sounds/snap.mp3", void = "rbxasset://sounds/bass.mp3", glass_shadow = "",
+	glasses = "rbxasset://sounds/snap.mp3", void = "rbxasset://sounds/bass.mp3", curse_open = "rbxasset://sounds/impact_water.mp3", transport = "rbxasset://sounds/swordlunge.wav", barrier = "rbxasset://sounds/bass.mp3", void_in = "rbxasset://sounds/bass.mp3", void_out = "rbxasset://sounds/impact_explosion_03.mp3", void_flash = "rbxasset://sounds/electronicpingshort.wav", seance = "rbxasset://sounds/bass.mp3", splash = "rbxasset://sounds/impact_water.mp3", glass_shadow = "",
 }
 D.music = {  -- master volume envelope (frame, volume): music drops for the awakening, falls silent for Purple's aftermath
-	{ 0, 0.5 }, { 3420, 0.5 }, { 3450, 0 }, { 4090, 0 }, { 4200, 0.5 }, { 6850, 0.5 }, { 6860, 0 }, { 7120, 0 }, { 7200, 0.4 }, { 7799, 0.4 },
+	{ 0, 0.5 }, { 3420, 0.5 }, { 3450, 0 }, { 4090, 0 }, { 4200, 0.5 }, { 6850, 0.5 }, { 6860, 0 }, { 7120, 0 }, { 7200, 0.4 }, { 8690, 0.4 }, { 8700, 0.05 }, { 9040, 0.05 }, { 9060, 0.5 }, { 9412, 0.5 }, { 9418, 0 }, { 9434, 0 }, { 9450, 0.5 }, { 10289, 0.5 },
 }
 
 ---------------------------------------------------------------------------------------------- engine data
@@ -3094,9 +3187,14 @@ end
 
 -- hair clump: a base block and a tapered tip, tilted outward
 local function clump(model, base, tip, offset, rot, c, tag)
-	accessory(model, "Head", base, CFrame.new(offset) * CFrame.Angles(rot.X, rot.Y, rot.Z), c, MAT, tag or "Hair")
-	local dir = CFrame.new(offset) * CFrame.Angles(rot.X, rot.Y, rot.Z) * CFrame.new(0, base.Y / 2 + tip.Y / 2 - 0.05, 0)
-	accessory(model, "Head", tip, dir, c, MAT, tag or "Hair")
+	-- three stacked, progressively narrower segments, each bent a little further: reads as a tapered lock, not a strip
+	local cf = CFrame.new(offset) * CFrame.Angles(rot.X, rot.Y, rot.Z)
+	local w, h, d = base.X, base.Y, base.Z
+	accessory(model, "Head", Vector3.new(w, h, d), cf, c, MAT, tag or "Hair")
+	cf = cf * CFrame.new(0, h / 2 + h * 0.3, 0) * CFrame.Angles(0.22, 0, rot.Z * 0.2)
+	accessory(model, "Head", Vector3.new(w * 0.72, h * 0.8, d * 0.72), cf, c, MAT, tag or "Hair")
+	cf = cf * CFrame.new(0, h * 0.4 + h * 0.28, 0) * CFrame.Angles(0.3, 0, rot.Z * 0.25)
+	accessory(model, "Head", Vector3.new(w * 0.4, h * 0.7, d * 0.4), cf, c, MAT, tag or "Hair")
 end
 
 -- TEEN GOJO: tall and slender, layered irregular white clumps with cool grey roots and gaps over the forehead, small round dark glasses,
@@ -3107,8 +3205,11 @@ local function buildGojo()
 	m:SetAttribute("Character", "Kael"); m:SetAttribute("Persona", "Gojo")
 	local head = m:FindFirstChild("Head")
 	local white, root = Color3.fromRGB(238, 240, 248), Color3.fromRGB(148, 156, 178)
-	local uniform, deep, shoe = Color3.fromRGB(24, 26, 38), Color3.fromRGB(16, 18, 28), Color3.fromRGB(20, 20, 26)
-	accessory(m, "Head", Vector3.new(1.3, 0.42, 1.3), CFrame.new(0, 0.62, 0.04), root, MAT, "Hair")               -- cool grey roots
+	local uniform, deep, shoe = Color3.fromRGB(36, 40, 58), Color3.fromRGB(24, 27, 42), Color3.fromRGB(26, 26, 32)
+	accessory(m, "Head", Vector3.new(1.4, 0.6, 1.4), CFrame.new(0, 0.66, 0.04), white, MAT, "Hair")                -- one continuous hair mass the locks grow out of
+	accessory(m, "Head", Vector3.new(1.34, 0.26, 1.34), CFrame.new(0, 0.44, 0.1), root, MAT, "Hair")               -- darker cool-grey underside and roots
+	accessory(m, "Head", Vector3.new(0.34, 1.0, 1.0), CFrame.new(-0.7, 0.2, 0.18), white, MAT, "Hair")            -- side hair joins mass to the jaw line
+	accessory(m, "Head", Vector3.new(0.34, 1.0, 1.0), CFrame.new(0.7, 0.2, 0.18), white, MAT, "Hair")
 	local clumps = {
 		{ Vector3.new(-0.5, 0.78, 0.0), Vector3.new(0.4, 0.5, 0.42), Vector3.new(0.5, 0, -0.55), 0.3 }, { Vector3.new(0.5, 0.8, 0.05), Vector3.new(0.42, 0.5, 0.42), Vector3.new(0.4, 0, 0.55), 0.3 },
 		{ Vector3.new(-0.2, 0.88, 0.2), Vector3.new(0.42, 0.55, 0.42), Vector3.new(0.9, 0, -0.2), 0.35 }, { Vector3.new(0.25, 0.9, 0.22), Vector3.new(0.4, 0.55, 0.42), Vector3.new(0.9, 0, 0.3), 0.32 },
@@ -3123,11 +3224,13 @@ local function buildGojo()
 		accessory(m, "Head", Vector3.new(0.12, 0.2, 0.14), CFrame.new(x + (i - 2.5) * 0.03, 0.34, -0.6) * CFrame.Angles(-0.2, 0, (i - 2.5) * 0.12), white, MAT, "Hair")
 	end
 	face(m, { eye = { 0.3, 0.2 }, pupil = { 0.17, 0.19 }, brow = { 0.34, 0.05, 6, 0.3 }, mouth = { 0.22, 3, -0.3 }, irisColor = Color3.fromRGB(96, 186, 255), browColor = Color3.fromRGB(226, 228, 236) })
+	for _, d in ipairs(m:GetDescendants()) do if d:IsA("BasePart") and d:GetAttribute("Eye") then d.Material = Enum.Material.Neon end end   -- tiny bright irises
 	buildGlasses(m, head, "Glasses")
 	-- teen uniform: dark high-collar jacket, clean shoulder line, fitted trousers, dark shoes
 	local function teen(partName, size, off, c, mat) local p = accessory(m, partName, size, off, c, mat or MAT); if p then p:SetAttribute("Teen", true) end return p end
 	teen("UpperTorso", Vector3.new(1.78, 1.5, 1.06), CFrame.new(0, -0.03, 0.01), uniform)
-	teen("UpperTorso", Vector3.new(1.62, 0.7, 1.18), CFrame.new(0, 0.86, 0.0), deep)                                 -- stand-up collar
+	teen("UpperTorso", Vector3.new(1.5, 0.5, 1.16), CFrame.new(0, 0.55, 0.0), deep)                                 -- stand-up collar, low enough to leave the jaw visible
+	accessory(m, "UpperTorso", Vector3.new(0.9, 0.4, 0.8), CFrame.new(0, 0.9, 0), skin, Enum.Material.SmoothPlastic)  -- neck
 	teen("UpperTorso", Vector3.new(2.0, 0.22, 1.1), CFrame.new(0, 0.66, 0.0), deep)                                 -- clean shoulder line
 	teen("UpperTorso", Vector3.new(0.07, 1.4, 0.07), CFrame.new(0, -0.05, -0.56), Color3.fromRGB(150, 150, 165), Enum.Material.Metal)
 	teen("LowerTorso", Vector3.new(1.8, 0.42, 1.06), CFrame.new(0, 0.1, 0.01), uniform)
@@ -3135,7 +3238,8 @@ local function buildGojo()
 	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do teen(n, Vector3.new(0.96, 1.1, 0.96), CFrame.new(0, 0, 0), deep) end
 	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do teen(n, Vector3.new(0.9, 1.0, 0.9), CFrame.new(0, 0.05, 0), deep) end
 	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do teen(n, Vector3.new(1.04, 0.7, 1.22), CFrame.new(0, 0.1, 0), shoe, Enum.Material.Leather) end
-	-- adult outfit + blindfold (epilogue only; hidden until then)
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm", "RightLowerLeg", "LeftLowerLeg" }) do teen(n, Vector3.new(1.06, 0.05, 1.06), CFrame.new(0, -0.15, 0), Color3.fromRGB(58, 62, 84)) end
+	-- adult outfit + blindfold (adult chapters only; hidden until then)
 	local function adult(partName, size, off, c, tag)
 		local p = accessory(m, partName, size, off, c, MAT, tag or "Adult")
 		if p then p:SetAttribute("Adult", true); p.Transparency = 1 end
@@ -3158,22 +3262,25 @@ local function buildToji()
 	local skin = Color3.fromRGB(222, 178, 150)
 	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(20, 20, 24), arm = skin, leg = Color3.fromRGB(206, 202, 190) })
 	m:SetAttribute("Character", "Ren"); m:SetAttribute("Persona", "Toji")
-	local hairC, shirt, pale, palerDark, shoe = Color3.fromRGB(22, 20, 22), Color3.fromRGB(20, 20, 24), Color3.fromRGB(206, 202, 190), Color3.fromRGB(176, 172, 160), Color3.fromRGB(30, 30, 34)
+	local hairC, shirt, pale, palerDark, shoe = Color3.fromRGB(24, 22, 26), Color3.fromRGB(34, 34, 42), Color3.fromRGB(206, 202, 190), Color3.fromRGB(176, 172, 160), Color3.fromRGB(30, 30, 34)
 	accessory(m, "Head", Vector3.new(1.3, 0.42, 1.3), CFrame.new(0, 0.64, 0.04), hairC, MAT, "Hair")
 	accessory(m, "Head", Vector3.new(0.3, 0.9, 1.1), CFrame.new(-0.62, 0.3, 0.1), hairC, MAT, "Hair")
 	accessory(m, "Head", Vector3.new(0.3, 0.9, 1.1), CFrame.new(0.62, 0.3, 0.1), hairC, MAT, "Hair")
 	accessory(m, "Head", Vector3.new(1.3, 0.9, 0.34), CFrame.new(0, 0.3, 0.5), hairC, MAT, "Hair")
-	for i, x in ipairs({ -0.5, -0.25, 0.0, 0.25, 0.5 }) do       -- straight strands falling across the forehead
-		accessory(m, "Head", Vector3.new(0.22, 0.5 - math.abs(x) * 0.15, 0.12), CFrame.new(x, 0.44 - math.abs(x) * 0.05, -0.6) * CFrame.Angles(-0.12, 0, x * 0.18), hairC, MAT, "Hair")
+	local lens = { 0.62, 0.44, 0.58, 0.36, 0.52, 0.4, 0.5 }                       -- irregular lower edge: strands of different length and lean
+	for i, x in ipairs({ -0.56, -0.38, -0.18, 0.02, 0.2, 0.4, 0.58 }) do
+		accessory(m, "Head", Vector3.new(0.2, lens[i], 0.12), CFrame.new(x, 0.52 - lens[i] / 2 + 0.2, -0.6) * CFrame.Angles(-0.1, 0, (i - 4) * 0.09), hairC, MAT, "Hair")
+		accessory(m, "Head", Vector3.new(0.1, 0.16, 0.1), CFrame.new(x + (i % 2 == 0 and 0.06 or -0.05), 0.52 - lens[i] + 0.16, -0.61), hairC, MAT, "Hair")
 	end
+	accessory(m, "Head", Vector3.new(1.3, 0.5, 0.2), CFrame.new(0, 0.55, -0.52), hairC, MAT, "Hair")
 	face(m, { eye = { 0.3, 0.1 }, pupil = { 0.17, 0.1 }, brow = { 0.38, 0.07, 8, 0.25 }, mouth = { 0.26, 0, -0.3 }, irisColor = Color3.fromRGB(70, 138, 92), browColor = Color3.fromRGB(26, 22, 24) })
 	local scar = accessory(m, "Head", Vector3.new(0.05, 0.17, 0.04), CFrame.new(0.19, -0.3, -0.625) * CFrame.Angles(0, 0, 0.5), Color3.fromRGB(190, 110, 110), Enum.Material.SmoothPlastic, "Scar")   -- right corner of the mouth
 	-- broad shoulders, tapered waist, fitted short-sleeve shirt, strong forearms
-	accessory(m, "UpperTorso", Vector3.new(2.6, 1.5, 1.14), CFrame.new(0, -0.03, 0.01), shirt, MAT)
-	accessory(m, "UpperTorso", Vector3.new(2.72, 0.42, 1.18), CFrame.new(0, 0.6, 0.01), Color3.fromRGB(28, 28, 32), MAT)       -- trapezius / shoulder line
+	accessory(m, "UpperTorso", Vector3.new(2.9, 1.5, 1.14), CFrame.new(0, -0.03, 0.01), shirt, MAT)
+	accessory(m, "UpperTorso", Vector3.new(3.04, 0.42, 1.18), CFrame.new(0, 0.6, 0.01), Color3.fromRGB(44, 44, 52), MAT)       -- trapezius / shoulder line
 	accessory(m, "UpperTorso", Vector3.new(1.0, 0.36, 0.9), CFrame.new(0, 0.92, 0), skin, Enum.Material.SmoothPlastic)         -- neck
 	accessory(m, "LowerTorso", Vector3.new(1.7, 0.5, 1.0), CFrame.new(0, 0.1, 0.01), shirt, MAT)                               -- tapered waist
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.3, 0.95, 1.3), CFrame.new(0, 0.2, 0), shirt, MAT) end   -- short sleeves
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.4, 0.95, 1.4), CFrame.new(0, 0.2, 0), shirt, MAT) end   -- short sleeves
 	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.18, 0.55, 1.18), CFrame.new(0, -0.35, 0), skin, Enum.Material.SmoothPlastic) end
 	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do accessory(m, n, Vector3.new(1.12, 0.85, 1.12), CFrame.new(0, 0.05, 0), skin, Enum.Material.SmoothPlastic) end
 	-- loose pale trousers, volume in the silhouette, gathered at the ankle
@@ -3188,25 +3295,36 @@ local function buildToji()
 	for i = 1, 3 do
 		local band = accessory(m, "UpperTorso", Vector3.new(2.78, 0.32, 1.5), CFrame.new(0, -0.55 + i * 0.3, 0.02) * CFrame.Angles(0, 0, (i - 2) * 0.12), (i % 2 == 0) and curse or curseDark, MAT, "Curse")
 	end
-	local lastH = cloth(m, "UpperTorso", "CurseHead", CFrame.new(-0.75, 0.7, 0.62), 3, Vector3.new(0.55, 0.55, 0.4), curse)
+	local headC = Color3.fromRGB(148, 126, 170)               -- lighter than the arm and the body bands so the head reads on its own
+	local lastH = cloth(m, "UpperTorso", "CurseHead", CFrame.new(-0.85, 0.7, 0.66), 3, Vector3.new(0.6, 0.55, 0.42), curse)
 	if lastH then
-		local face_ = part({ Size = Vector3.new(0.95, 0.85, 0.8), Color = curse, Material = MAT, Anchored = false, Massless = true }, m)
-		face_:SetAttribute("Curse", true)
-		weld(face_, lastH, CFrame.new(0, -0.62, 0))
+		local upper = part({ Size = Vector3.new(1.2, 0.6, 1.0), Color = headC, Material = MAT, Anchored = false, Massless = true }, m)
+		upper:SetAttribute("Curse", true); upper.Name = "CurseSkull"
+		weld(upper, lastH, CFrame.new(0, -0.55, 0))
+		local jaw = part({ Size = Vector3.new(1.1, 0.34, 0.9), Color = headC, Material = MAT, Anchored = false, Massless = true }, m)
+		jaw:SetAttribute("Curse", true); jaw.Name = "CurseJaw"
+		local jm = Instance.new("Motor6D")
+		jm.Name = "CurseJawJoint"; jm.Part0, jm.Part1 = upper, jaw
+		jm.C0 = CFrame.new(0, -0.3, -0.38); jm.C1 = CFrame.new(0, 0.1, -0.38)
+		jm:SetAttribute("JawJoint", true); jm.Parent = jaw
+		local mouthIn = part({ Size = Vector3.new(0.96, 0.08, 0.8), Color = Color3.fromRGB(86, 26, 52), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+		weld(mouthIn, upper, CFrame.new(0, -0.31, 0.02))
 		for _, s in ipairs({ -1, 1 }) do
-			local e = part({ Size = Vector3.new(0.18, 0.1, 0.05), Color = Color3.fromRGB(235, 232, 220), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
-			weld(e, face_, CFrame.new(s * 0.24, 0.12, -0.42))
-			local pu = part({ Size = Vector3.new(0.07, 0.07, 0.05), Color = Color3.fromRGB(20, 18, 24), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
-			weld(pu, face_, CFrame.new(s * 0.24, 0.12, -0.44))
+			local e = part({ Size = Vector3.new(0.28, 0.2, 0.06), Color = Color3.fromRGB(235, 232, 220), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(e, upper, CFrame.new(s * 0.32, 0.1, -0.52))
+			local pu = part({ Size = Vector3.new(0.12, 0.14, 0.07), Color = Color3.fromRGB(150, 30, 40), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(pu, upper, CFrame.new(s * 0.32, 0.1, -0.55))
 		end
-		local mouth = part({ Size = Vector3.new(0.62, 0.14, 0.05), Color = Color3.fromRGB(40, 30, 50), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
-		weld(mouth, face_, CFrame.new(0, -0.2, -0.42))
-		for k = -2, 2 do
-			local tooth = part({ Size = Vector3.new(0.07, 0.1, 0.05), Color = Color3.fromRGB(225, 222, 210), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
-			weld(tooth, face_, CFrame.new(k * 0.12, -0.18, -0.44))
+		for k = -3, 3 do
+			local tooth = part({ Size = Vector3.new(0.1, 0.16, 0.06), Color = Color3.fromRGB(228, 224, 210), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(tooth, upper, CFrame.new(k * 0.15, -0.36, -0.46))
 		end
 	end
-	cloth(m, "LowerTorso", "CurseTail", CFrame.new(0.4, -0.05, 0.56), 4, Vector3.new(0.5, 0.6, 0.3), curseDark)
+	local tail = cloth(m, "LowerTorso", "CurseTail", CFrame.new(0.4, -0.05, 0.56), 4, Vector3.new(0.5, 0.6, 0.3), curseDark)
+	for i, f in ipairs({ 1.0, 0.8, 0.62, 0.45 }) do             -- tapered tail
+		local seg = m:FindFirstChild("CurseTail" .. i)
+		if seg then seg.Size = Vector3.new(0.5 * f, 0.6, 0.3 * f) end
+	end
 	for _, c in ipairs(m:GetChildren()) do
 		if c:IsA("BasePart") and (c.Name:sub(1, 9) == "CurseHead" or c.Name:sub(1, 9) == "CurseTail") then c:SetAttribute("Curse", true) end
 	end
@@ -4185,7 +4303,7 @@ put(SP, "LocalScript", "BGDuelPlayer", [====[
 -- Playback is by ELAPSED time. Every state (glasses, spear, chain, tiles, lighting, costume) is a pure function of the frame,
 -- so selecting any chapter starts it correctly. Runs while stage Mode == "Cinematic"; Mode "Preview" is the neutral-light character preview.
 --
---  1-9  jump to chapter    [ ]  previous / next chapter    R  full replay    Space  pause    , .  step a frame
+--  1-9, 0, -, =  jump to chapter 1-12 (10 = Unlimited Void, 11 = its 0.2 s application, 12 = Shibuya Toji)    [ ]  previous / next chapter    R  full replay    Space  pause    , .  step a frame
 --  B    slow motion (also automatic on the first Infinity stop and before Purple)    V  effects on/off
 --  F    fixed wide camera (animation check)    N  neutral light    H  show/hide HUD + panel    C  contact checks    P  character preview
 --  Preview: Left/Right = front / profile / fight camera / close-ups, G = glasses on/off, N = neutral light.   Tab = playable mode.
@@ -4292,7 +4410,7 @@ local stopObjs = {}
 do
 	local c = stopC
 	local n = c.n
-	local fieldPart = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 3.2, 3.2), Color3.fromRGB(200, 215, 255), Enum.Material.ForceField, 1)
+	local fieldPart = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 3.2, 3.2), Color3.fromRGB(200, 215, 255), Enum.Material.SmoothPlastic, 1)
 	local ripple = mk(Enum.PartType.Cylinder, Vector3.new(0.04, 1, 1), Color3.fromRGB(225, 232, 255), Enum.Material.SmoothPlastic, 1)
 	local dust = {}
 	for i = 1, 16 do
@@ -4413,7 +4531,7 @@ local function updateFly(f)
 	end
 end
 local foldRing = mk(Enum.PartType.Cylinder, Vector3.new(0.05, 1, 1), Color3.fromRGB(240, 244, 255), Enum.Material.Neon, 1)
-local foldDisc = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 1, 1), Color3.fromRGB(190, 205, 255), Enum.Material.ForceField, 1)
+local foldDisc = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 1, 1), Color3.fromRGB(190, 205, 255), Enum.Material.SmoothPlastic, 1)
 local function updateFold(f)
 	local fo = D.fx.fold
 	if not state.fx or f < fo.f or f > fo.f + fo.dur + 10 then foldRing.Transparency, foldDisc.Transparency = 1, 1; return end
@@ -4571,25 +4689,12 @@ local function setGlasses(f)
 end
 
 -- epilogue: adult outfit + blindfold, void streaks, a suspended dummy
-local streaks = {}
-for i = 1, 120 do
-	local col = ({ Color3.fromRGB(90, 160, 255), Color3.fromRGB(235, 240, 255), Color3.fromRGB(190, 110, 255), Color3.fromRGB(255, 120, 150) })[rng:NextInteger(1, 4)]
-	streaks[i] = { part = mk(nil, Vector3.new(0.06, 0.06, rng:NextNumber(1, 5)), col, Enum.Material.Neon, 1), dir = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(-1, 1), rng:NextNumber(-1, 1)).Unit,
-		r = rng:NextNumber(4, 22), ph = rng:NextNumber(0, 6.28), sp = rng:NextNumber(0.4, 2.2) }
-end
-local dummy = Instance.new("Model"); dummy.Name = "TrainingDummy"; dummy.Parent = fxFolder
-local dummyParts = {}
-do
-	local function dp(size, pos) local p = mk(nil, size, Color3.fromRGB(150, 150, 156), Enum.Material.SmoothPlastic, 1); p.Parent = dummy; table.insert(dummyParts, { part = p, off = pos }) end
-	dp(Vector3.new(1.8, 2.0, 1.0), Vector3.new(0, 3.2, 0)); dp(Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 4.8, 0)); dp(Vector3.new(0.8, 2.2, 0.8), Vector3.new(-1.3, 3.1, 0)); dp(Vector3.new(0.8, 2.2, 0.8), Vector3.new(1.3, 3.1, 0))
-	dp(Vector3.new(0.9, 2.2, 0.9), Vector3.new(-0.5, 1.1, 0)); dp(Vector3.new(0.9, 2.2, 0.9), Vector3.new(0.5, 1.1, 0))
-end
 local adultParts, teenParts, blindR = {}, {}, {}
 for _, d in ipairs(fighters.Blue:GetDescendants()) do
 	if d:IsA("BasePart") then
 		if d:GetAttribute("Adult") then table.insert(adultParts, { part = d, trans = 0 }) end
 		if d:GetAttribute("Teen") then table.insert(teenParts, { part = d, trans = d.Transparency }) end
-		if d:GetAttribute("BlindfoldR") then table.insert(blindR, d) end
+		if d:GetAttribute("Blindfold") then table.insert(blindR, d) end
 	end
 end
 local spearParts, curseParts = {}, {}
@@ -4598,38 +4703,12 @@ local function updateCostumes(f)
 	local adult = f >= D.duelFrames
 	for _, p in ipairs(adultParts) do p.part.Transparency = adult and 0 or 1 end
 	for _, p in ipairs(teenParts) do p.part.Transparency = adult and 1 or p.trans end
-	for _, p in ipairs(blindR) do p.Transparency = (adult and f < 7401) and 0 or 1 end        -- one eye revealed
+	local uncovered = (f >= 8500 and f < 9210) or (f >= 9400 and f < 9446)                      -- eyes uncovered for the domain and the 0.2 s application
+	for _, p in ipairs(blindR) do p.Transparency = (adult and not uncovered) and 0 or 1 end
 	for _, p in ipairs(spearParts) do p.Transparency = D.spearVisible(f) and 0 or 1 end
 	rctEm.Rate = (state.fx and f >= D.fx.rct.f0 and f <= D.fx.rct.f1) and 10 or 0
 end
 local origLight = { ambient = Lighting.Ambient, out = Lighting.OutdoorAmbient }
-local function updateVoid(f)
-	local v = D.fx.void
-	local on = f >= v.f0 and f <= v.f1
-	local k = clamp01((f - v.f0) / 60)
-	for _, p in ipairs(dummyParts) do
-		p.part.Transparency = (on and mode() == "Cinematic") and 0 or 1
-		p.part.CFrame = CFrame.new(Vector3.new(14, 0, 0) + p.off + Vector3.new(0, math.sin(f * 0.05) * 0.04, 0))
-	end
-	local c = snap.Blue and snap.Blue.out.cf.UpperTorso.Position or Vector3.new(6, 4, 0)
-	for _, s in ipairs(streaks) do
-		if not (on and state.fx) then s.part.Transparency = 1
-		else
-			s.part.Transparency = 1 - k * 0.85
-			local a = s.ph + f / 30 * s.sp
-			local pos = c + s.dir * (s.r + math.sin(a) * 2) + Vector3.new(0, math.cos(a) * 1.5, 0)
-			s.part.CFrame = CFrame.lookAt(pos, pos + s.dir:Cross(Vector3.new(0, 1, 0)) + Vector3.new(0, 0.2, 0))
-		end
-	end
-	-- the courtyard dissolves into the field
-	if f >= v.f0 - 20 then
-		for _, d in ipairs(stage:GetChildren()) do
-			if d:IsA("BasePart") and not d:GetAttribute("Invisible") then
-				d.Transparency = clamp01((f - (v.f0 - 20)) / 60)
-			end
-		end
-	end
-end
 local function restoreStage()
 	for _, d in ipairs(stage:GetChildren()) do
 		if d:IsA("BasePart") and not d:GetAttribute("Invisible") then d.Transparency = 0 end
@@ -4637,8 +4716,224 @@ local function restoreStage()
 	for _, t in ipairs(tiles) do t.part.Transparency = 0 end
 end
 
+
+---------------------------------------------------------------- adult chapters, Unlimited Void, Shibuya (all stateless functions of the frame)
+local DUSK = { amb = Color3.fromRGB(104, 104, 118), out = Color3.fromRGB(116, 116, 130), bright = 1.6 }
+local function uvK(f)             -- 0 = courtyard, 1 = inside the domain
+	local u = D.fx.uv
+	if f < u.closeStart or f > u.restored then return 0 end
+	if f < u.closeEnd then return (f - u.closeStart) / (u.closeEnd - u.closeStart) end
+	if f < u.release then return 1 end
+	return math.max(0, 1 - (f - u.release) / 20)
+end
+local function envHide(f)         -- how far the courtyard has dissolved (domain interior, 0.2 s application, Shibuya water)
+	local k = uvK(f)
+	local o = D.fx.uv02
+	if f >= o.f and f < o.f + o.frames then k = 1 end
+	local w = D.fx.water
+	if f >= w.f0 then k = math.max(k, math.min(1, (f - w.f0) / 40)) end
+	return k
+end
+-- construct: the "appropriate curse opponent" (a lumpy purple-grey body, big head, long arms)
+local construct = Instance.new("Model"); construct.Name = "CurseConstruct"; construct.Parent = fxFolder
+local cParts = {}
+do
+	local function cp(size, off, color, shape) local q = mk(shape, size, color, Enum.Material.SmoothPlastic, 1); q.Parent = construct; table.insert(cParts, { part = q, off = off }) return q end
+	local body, skin = Color3.fromRGB(96, 80, 108), Color3.fromRGB(128, 110, 140)
+	cp(Vector3.new(2.6, 3.2, 1.8), CFrame.new(0, 3.0, 0), body)
+	cp(Vector3.new(1.9, 1.6, 1.6), CFrame.new(0, 5.2, -0.2), skin)
+	cp(Vector3.new(0.5, 0.3, 0.1), CFrame.new(-0.4, 5.3, -1.05), Color3.fromRGB(240, 236, 220))
+	cp(Vector3.new(0.5, 0.3, 0.1), CFrame.new(0.4, 5.3, -1.05), Color3.fromRGB(240, 236, 220))
+	cp(Vector3.new(1.2, 0.3, 0.1), CFrame.new(0, 4.8, -1.05), Color3.fromRGB(50, 24, 44))
+	cp(Vector3.new(0.9, 3.4, 0.9), CFrame.new(-1.9, 3.2, -0.3), skin)      -- arms
+	cp(Vector3.new(0.9, 3.4, 0.9), CFrame.new(1.9, 3.2, -0.3), skin)
+	cp(Vector3.new(1.0, 2.4, 1.0), CFrame.new(-0.7, 1.2, 0), body)
+	cp(Vector3.new(1.0, 2.4, 1.0), CFrame.new(0.7, 1.2, 0), body)
+end
+local function constructX(f)
+	for _, c in ipairs(D.fx.construct) do if f >= c.f0 and f < c.f1 then return c, c.x end end
+end
+local function updateConstruct(f)
+	local c, x = constructX(f)
+	local show = c and state.fx
+	local u = D.fx.uv
+	local root = CFrame.new((x or 10), 0, 0)
+	local wob, stall = 0, 1
+	if c and f >= u.f0 and f < u.f1 then
+		root = CFrame.new(x - 3 * math.min(1, (f - 8400) / 80), 0, 0)                    -- it charges, then the domain closes on it
+		stall = (f >= u.opp0 and f < u.release) and 0.04 or 1                              -- inside: its attempted movement stalls
+		wob = math.sin(f * 0.35 * stall) * 0.25
+	elseif c and f >= 9300 and f < 9540 then
+		stall = (f >= 9420 and f < 9440) and 0.05 or 1
+		wob = math.sin(f * 0.3 * stall) * 0.2
+	elseif c and f >= 9740 then
+		local k = f >= 9968 and math.min(1, (f - 9968) / 14) or 0                        -- Playful Cloud sweep knocks it back across the water
+		root = CFrame.new(x + 7 * easeOut(k), 0.8 * math.sin(math.pi * math.min(1, k)), 0)
+		wob = k > 0 and k < 1 and 0.3 or 0
+	end
+	for _, e in ipairs(cParts) do
+		e.part.Transparency = show and 0 or 1
+		if show then e.part.CFrame = root * CFrame.Angles(0, math.rad(0), wob) * e.off end
+	end
+end
+-- the domain: far luminous centre + layered streams that keep accumulating
+local centerBall = mk(Enum.PartType.Ball, Vector3.new(4, 4, 4), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, 1)
+local streams = {}
+for i = 1, 260 do
+	local layer = (i % 3) + 1
+	local col = ({ Color3.fromRGB(90, 160, 255), Color3.fromRGB(240, 244, 255), Color3.fromRGB(185, 110, 255), Color3.fromRGB(255, 140, 170) })[rng:NextInteger(1, 4)]
+	streams[i] = { part = mk(nil, Vector3.new(0.05 * layer, 0.05 * layer, 1.5 + layer * 1.6), col, Enum.Material.Neon, 1), layer = layer,
+		x = rng:NextNumber(-34, 34), y = rng:NextNumber(-4, 18), z0 = rng:NextNumber(-60, 12), speed = (4 - layer) * 4 + rng:NextNumber(2, 7), born = rng:NextInteger(0, 330) }
+end
+local domeShell = mk(Enum.PartType.Ball, Vector3.new(36, 36, 36), Color3.fromRGB(70, 80, 120), Enum.Material.SmoothPlastic, 1)
+local function updateDomain(f)
+	local k = envHide(f)
+	-- courtyard dissolves; light falls with it
+	for _, d in ipairs(stage:GetChildren()) do
+		if d:IsA("BasePart") and not d:GetAttribute("Invisible") and d.Name ~= "PillarJag" then d.Transparency = (f >= D.fx.water.f0) and 1 or k end
+	end
+	local dark = math.min(1, uvK(f) + (f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames and 1 or 0))
+	if mode() == "Cinematic" and not state.neutral then
+		Lighting.Ambient = DUSK.amb:Lerp(Color3.fromRGB(8, 8, 14), dark)
+		Lighting.OutdoorAmbient = DUSK.out:Lerp(Color3.fromRGB(8, 8, 14), dark)
+		Lighting.Brightness = DUSK.bright * (1 - 0.85 * dark)
+	end
+	local u = D.fx.uv
+	-- barrier: the shell closes in a wide shot (visible from outside only)
+	local cl = (f >= u.closeStart and f < u.release) and ease(clamp01((f - u.closeStart) / (u.closeEnd - u.closeStart))) or 0
+	local rel = f >= u.release and f < u.release + 14
+	local shell = state.fx and ((cl > 0 and f < u.release) or rel)
+	domeShell.Transparency = shell and (rel and (0.5 + 0.5 * (f - u.release) / 14) or (1 - 0.35 * cl)) or 1
+	local sz = 52 - 16 * cl; if rel then sz = 36 + 30 * (f - u.release) / 14 end
+	domeShell.Size = Vector3.new(sz, sz, sz); domeShell.Position = Vector3.new(7, 4, 0)
+	-- interior
+	local inside = state.fx and (uvK(f) > 0.5 or (f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames))
+	centerBall.Transparency = inside and 0.05 or 1
+	centerBall.Position = Vector3.new(8, 4, -46)
+	local grow = clamp01(((f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames) and 330 or (f - u.inside0)) / 330)
+	local nShow = math.floor(40 + 220 * grow)                       -- information keeps accumulating while the opponent is stalled
+	local rateMul = (f >= u.opp0 and f < u.release) and 1.8 or 1
+	for i, s in ipairs(streams) do
+		if not inside or i > nShow then s.part.Transparency = 1
+		else
+			s.part.Transparency = 0.1 + 0.1 * s.layer
+			local z = ((s.z0 + (f / 30) * s.speed * rateMul * s.layer * 0.8) % 80) - 62                    -- three depth layers at different speeds
+			s.part.CFrame = CFrame.new(8 + s.x * (0.4 + 0.3 * s.layer), s.y * 0.7 + 3, z)
+		end
+	end
+end
+-- adult chapter effects: Infinity filter, Maximum Output Blue, blink, curtain
+local leaf = mk(nil, Vector3.new(0.36, 0.03, 0.22), Color3.fromRGB(96, 150, 80), Enum.Material.Fabric, 1)
+local stone = mk(Enum.PartType.Ball, Vector3.new(0.28, 0.28, 0.28), Color3.fromRGB(110, 108, 114), Enum.Material.Slate, 1)
+local mbPoint = mk(Enum.PartType.Ball, Vector3.new(1, 1, 1), BLUE, Enum.Material.Neon, 1)
+local curtain = mk(Enum.PartType.Ball, Vector3.new(70, 70, 70), Color3.fromRGB(20, 22, 34), Enum.Material.SmoothPlastic, 1)
+local function updateAdult(f)
+	local fl = D.fx.filter
+	local gx = 6.0
+	-- two visibly different incoming objects: the leaf is let through, the stone is stopped
+	local lf = state.fx and f >= fl.leaf.f0 and f <= fl.leaf.f1 + 40
+	leaf.Transparency = lf and 0 or 1
+	if lf then
+		local u = clamp01((f - fl.leaf.f0) / (fl.leaf.f1 - fl.leaf.f0))
+		leaf.CFrame = CFrame.new(gx - 6 + 12 * u, 3.6 + math.sin(u * 9) * 0.3 - u * 1.0, 0.5 + math.sin(u * 6) * 0.3) * CFrame.Angles(u * 7, u * 3, u * 5)
+	end
+	local st = state.fx and f >= fl.stone.f0 and f <= fl.stone.f1 + 40
+	stone.Transparency = st and 0 or 1
+	if st then
+		local u = clamp01((f - fl.stone.f0) / 40)
+		local x = gx - 6 + (6 - 1.0) * easeOut(u)                        -- decelerates and stops a visible gap short of him
+		local drop = f > fl.stone.f1 and (f - fl.stone.f1) / 30 or 0
+		stone.Position = Vector3.new(x, math.max(0.15, 3.4 - 0.5 * 22 * drop * drop), 0.55)
+	end
+	-- Maximum Output Blue: a much larger area of displacement
+	local mb = D.fx.maxBlue
+	local on = state.fx and f >= mb.f0 and f <= mb.f1
+	local pt = Vector3.new(mb.point[1], mb.point[2], mb.point[3])
+	mbPoint.Transparency = on and 0 or 1
+	mbPoint.Position = pt
+	local ms = 1.2 + 0.5 * math.sin(f * 0.3); mbPoint.Size = Vector3.new(ms, ms, ms)
+	for _, t in ipairs(tiles) do
+		if on or (f > mb.f1 and f < mb.f1 + 30) then
+			local ramp = on and math.min(clamp01((f - mb.f0) / 50), clamp01((mb.f1 - f) / 40)) or 0
+			local dx, dz = pt.X - t.x, pt.Z - t.z
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < mb.radius and d > 0.5 then
+				local fall = 1 - d / mb.radius
+				local lift = 4.5 * ramp * fall
+				t.part.CFrame = CFrame.new(t.x + dx / d * 2.5 * ramp * fall, 0.2 + lift, t.z + dz / d * 2.5 * ramp * fall) * CFrame.Angles(math.sin(t.col * 3) * 0.3 * ramp * fall, 0, math.cos(t.row * 2 + t.col) * 0.3 * ramp * fall)
+			end
+		end
+	end
+	local cu = D.fx.curtain
+	local cOn = state.fx and f >= cu.f0 and f <= cu.f1
+	curtain.Transparency = cOn and (0.72 + 0.28 * math.abs(math.sin(f * 0.15)) * 0) or 1
+	curtain.Position = Vector3.new(6, 3, 0)
+end
+-- Shibuya: water, splashes along Toji's path, Playful Cloud (three sections)
+local water = mk(nil, Vector3.new(220, 0.4, 120), Color3.fromRGB(70, 92, 118), Enum.Material.SmoothPlastic, 1)
+local rings = {}
+for i = 1, 14 do rings[i] = mk(Enum.PartType.Cylinder, Vector3.new(0.05, 1, 1), Color3.fromRGB(220, 232, 245), Enum.Material.SmoothPlastic, 1) end
+local splashFrames = { 9806, 9808, 9810, 9812, 9814, 9816, 9818, 9820, 9968, 10106, 10110, 10116, 10124 }
+local cloud = { mk(nil, Vector3.new(0.16, 0.16, 1.1), Color3.fromRGB(34, 34, 40), Enum.Material.Metal, 1), mk(nil, Vector3.new(0.16, 0.16, 1.1), Color3.fromRGB(34, 34, 40), Enum.Material.Metal, 1), mk(nil, Vector3.new(0.16, 0.16, 1.1), Color3.fromRGB(34, 34, 40), Enum.Material.Metal, 1) }
+local function updateShibuya(f)
+	local w = D.fx.water
+	local on = f >= w.f0 and f <= w.f1
+	water.Transparency = on and 0.15 or 1
+	water.Position = Vector3.new(0, -0.15, 0)
+	for i, r in ipairs(rings) do
+		local sf = splashFrames[i]
+		if on and state.fx and sf and f >= sf and f < sf + 22 then
+			local u = (f - sf) / 22
+			local p = bodyAt("Purple", sf)
+			r.Size = Vector3.new(0.05, 0.6 + 5 * easeOut(u), 0.6 + 5 * easeOut(u))
+			r.CFrame = CFrame.new(p.rx, 0.1, p.rz) * CFrame.Angles(0, 0, math.rad(90))
+			r.Transparency = 0.2 + 0.8 * u
+		else r.Transparency = 1 end
+	end
+	-- Playful Cloud: folded into three sections at rest, extended in a sweep
+	local has = f >= 9750 and f <= w.f1
+	local hand = fighters.Purple:FindFirstChild("RightHand")
+	local open = 0
+	if f >= 9960 and f <= 10040 then open = 1 elseif f >= 10112 and f <= 10200 then open = 1 elseif f >= 9806 and f <= 9830 then open = 0.7 end
+	for i, c in ipairs(cloud) do
+		c.Transparency = (has and hand) and 0 or 1
+		if has and hand then
+			local base = hand.CFrame * CFrame.new(0, -0.1, -0.3)
+			local fold = (1 - open) * (i == 2 and 1.2 or (i == 3 and -1.0 or 0))
+			c.CFrame = base * CFrame.new(0, 0, -(i - 1) * 1.15 * (0.55 + 0.45 * open)) * CFrame.Angles(fold, 0, 0)
+		end
+	end
+end
+-- curse mouth opens and the spear is drawn out of it (chapter 4 close-up)
+local jawMotor
+for _, d in ipairs(fighters.Purple:GetDescendants()) do if d:IsA("Motor6D") and d:GetAttribute("JawJoint") then jawMotor = d end end
+local emergeProp = {}
+for _, spec in ipairs({ { Vector3.new(0.14, 0.14, 1.0), Color3.fromRGB(28, 26, 30), 0 }, { Vector3.new(0.1, 0.26, 0.8), Color3.fromRGB(182, 186, 196), -0.9 } }) do
+	table.insert(emergeProp, { part = mk(nil, spec[1], spec[2], Enum.Material.Metal, 1), z = spec[3] })
+end
+local function updateEmerge(f)
+	local e = D.fx.emerge
+	local k = 0
+	if f >= e.f0 and f <= e.f1 + 10 then k = math.min(clamp01((f - e.f0) / 8), clamp01((e.f1 + 10 - f) / 8)) end
+	if jawMotor then jawMotor.Transform = CFrame.Angles(0.75 * k, 0, 0) end
+	local skull = fighters.Purple:FindFirstChild("CurseSkull")
+	local hand = fighters.Purple:FindFirstChild("RightHand")
+	local show = state.fx ~= nil and f >= e.f0 + 6 and f < e.f1 and skull and hand
+	for _, p in ipairs(emergeProp) do
+		p.part.Transparency = show and 0 or 1
+		if show then
+			local u = easeOut(clamp01((f - e.f0 - 6) / (e.f1 - e.f0 - 6)))
+			local from = (skull.CFrame * CFrame.new(0, -0.35, -0.7)).Position
+			local to = (hand.CFrame * CFrame.new(0, -0.1, -0.35)).Position
+			local pos = from:Lerp(to, u)
+			p.part.CFrame = CFrame.lookAt(pos, pos + (to - from).Unit + Vector3.new(0, 0.001, 0)) * CFrame.new(0, 0, p.z * 0.5)
+		end
+	end
+end
+
 local function updateScene(f)
-	updatePebble(f); updateStops(f); updateBlue(f); updateFly(f); updateFold(f); updateRed(f); updatePurple(f); updateChain(f); updateVoid(f)
+	updatePebble(f); updateStops(f); updateBlue(f); updateFly(f); updateFold(f); updateRed(f); updatePurple(f); updateChain(f)
+	updateEmerge(f); updateAdult(f); updateConstruct(f); updateDomain(f); updateShibuya(f)
 end
 
 ---------------------------------------------------------------- sound
@@ -4731,7 +5026,7 @@ local function seekFrame(frame)
 	resetEvents(frame)
 	for _, id in ipairs({ "Blue", "Purple" }) do cloth[id]:reset() end
 	resetLane()
-	if frame < D.fx.void.f0 - 20 then restoreStage() end
+	restoreStage()
 end
 local function cleanup()
 	for _, name in ipairs({ "BGEffects", "BGStyleFX" }) do local f = Workspace:FindFirstChild(name); if f then for _, c in ipairs(f:GetChildren()) do c:Destroy() end end end
@@ -4859,8 +5154,60 @@ local function runChecks()
 	state.fx, state.playing, state.t = keep[1], keep[2], keep[3]
 end
 
+
+---------------------------------------------------------------- shot audit: isolate what owns a stray flat rectangle (key X)
+local isoStep, isoHidden = 0, {}
+local ISO = { "BGDuelFX effect parts", "particle emitters", "decals / textures / surface GUIs", "ForceField + Glass material parts", "Neon parts", "all courtyard geometry" }
+local function isoRestore()
+	for inst, prop in pairs(isoHidden) do pcall(function() if prop.t ~= nil then inst.Transparency = prop.t elseif prop.e ~= nil then inst.Enabled = prop.e elseif prop.v ~= nil then inst.Visible = prop.v end end) end
+	isoHidden = {}
+end
+local function isoApply(step)
+	local n = 0
+	for _, d in ipairs(Workspace:GetDescendants()) do
+		local hit = false
+		if step == 1 then hit = d:IsA("BasePart") and d:IsDescendantOf(fxFolder)
+		elseif step == 2 then hit = d:IsA("ParticleEmitter") or d:IsA("Beam") or d:IsA("Trail")
+		elseif step == 3 then hit = d:IsA("Decal") or d:IsA("Texture") or d:IsA("SurfaceGui")
+		elseif step == 4 then hit = d:IsA("BasePart") and (d.Material == Enum.Material.ForceField or d.Material == Enum.Material.Glass)
+		elseif step == 5 then hit = d:IsA("BasePart") and d.Material == Enum.Material.Neon
+		elseif step == 6 then hit = d:IsA("BasePart") and d:IsDescendantOf(stage) and not d:IsDescendantOf(fighters.Blue) and not d:IsDescendantOf(fighters.Purple) end
+		if hit then
+			n += 1
+			if d:IsA("BasePart") then isoHidden[d] = { t = d.Transparency }; d.Transparency = 1
+			elseif d:IsA("SurfaceGui") then isoHidden[d] = { e = d.Enabled }; d.Enabled = false
+			elseif d:IsA("Decal") or d:IsA("Texture") then isoHidden[d] = { t = d.Transparency }; d.Transparency = 1
+			else isoHidden[d] = { e = d.Enabled }; d.Enabled = false end
+		end
+	end
+	return n
+end
+local function auditShot()
+	print("[SHOT AUDIT] visible flat or large pale parts, textured parts and wide particle emitters in the scene:")
+	local cam = Workspace.CurrentCamera
+	local c = 0
+	for _, d in ipairs(Workspace:GetDescendants()) do
+		if d:IsA("BasePart") and d.Transparency < 0.95 and not d:IsDescendantOf(fighters.Blue) and not d:IsDescendantOf(fighters.Purple) then
+			local s = d.Size
+			local mn, mx = math.min(s.X, s.Y, s.Z), math.max(s.X, s.Y, s.Z)
+			local col = d.Color
+			local pale = (col.R + col.G + col.B) / 3 > 0.7
+			if (mn < 0.4 and mx > 2 and pale) or d.Material == Enum.Material.ForceField or d.Material == Enum.Material.Glass then
+				c += 1
+				if c <= 12 then print(string.format("   %s  size %.1f x %.1f x %.1f  material %s  transparency %.2f", d:GetFullName(), s.X, s.Y, s.Z, d.Material.Name, d.Transparency)) end
+			end
+		elseif (d:IsA("Decal") or d:IsA("Texture") or d:IsA("SurfaceGui")) then print("   textured: " .. d:GetFullName())
+		elseif d:IsA("ParticleEmitter") and d.Enabled then
+			local mx = 0
+			for _, k in ipairs(d.Size.Keypoints) do mx = math.max(mx, k.Value) end
+			if mx > 2 then print(string.format("   wide emitter: %s  size %.1f", d:GetFullName(), mx)) end
+		end
+	end
+	print("[SHOT AUDIT] " .. c .. " candidate parts. Press X (paused on the shot) to hide one category at a time; the rectangle disappears with its owner.")
+end
+
 ---------------------------------------------------------------- controls
-local CHAPTER_KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine }
+local CHAPTER_KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine, Enum.KeyCode.Zero, Enum.KeyCode.Minus, Enum.KeyCode.Equals }
 local function gotoChapter(i) state.chapter = i; seekFrame(chapterStart(i)); state.playing = true end
 local function currentChapter() return D.chapterAt(math.floor(state.t * D.fps)).id end
 UserInputService.InputBegan:Connect(function(input, gp)
@@ -4888,6 +5235,11 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	elseif k == Enum.KeyCode.N then state.neutral = not state.neutral; applyLook(); Look.audit()
 	elseif k == Enum.KeyCode.H then hudOn = not hudOn; stage:SetAttribute("UIVisible", hudOn)
 	elseif k == Enum.KeyCode.C then task.spawn(runChecks)
+	elseif k == Enum.KeyCode.X then
+		isoRestore()
+		isoStep = isoStep % (#ISO + 1) + 1
+		if isoStep > #ISO then isoStep = 0; print("[SHOT AUDIT] everything restored"); auditShot()
+		else print(string.format("[SHOT AUDIT] hidden: %s (%d instances)", ISO[isoStep], isoApply(isoStep))) end
 	elseif k == Enum.KeyCode.P then stage:SetAttribute("Mode", "Preview") end
 end)
 stage:GetAttributeChangedSignal("CinCmd"):Connect(function()

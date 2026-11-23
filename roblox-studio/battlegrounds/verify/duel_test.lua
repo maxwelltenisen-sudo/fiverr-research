@@ -40,7 +40,7 @@ for _, ch in ipairs(D.chapters) do
 			end
 			prev[who] = Ow
 		end
-		if ch.id ~= 9 and not (fr >= 906 and fr <= 1000) then
+		if ch.id < 9 and not (fr >= 906 and fr <= 1000) then
 			for _, who in ipairs({ "Blue", "Purple" }) do
 				local other = who == "Blue" and "Purple" or "Blue"
 				local a, b = O[other].cf.LowerTorso.Position, O[other].cf.Head.Position

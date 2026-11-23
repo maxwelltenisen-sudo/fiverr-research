@@ -4,7 +4,7 @@
 -- Every state (glasses, spear, chain, tiles, lighting) is a pure function of the frame, so any chapter starts correctly when selected.
 --   Axes: +X is screen-right. Gojo faces -X (toward the gate), Toji faces +X. Heights: gy = ground height under the fighter.
 local D = {}
-D.fps, D.duelFrames, D.frames = 30, 7200, 7800
+D.fps, D.duelFrames, D.frames = 30, 7200, 10290
 D.duration = D.frames / D.fps
 
 local function sec(m, s) return math.floor((m * 60 + s) * D.fps) end
@@ -17,7 +17,10 @@ D.chapters = {
 	{ id = 6, name = "Red",                   f0 = sec(2, 20),  f1 = sec(2, 55),  q = "Can he be hit now?" },
 	{ id = 7, name = "Toji's full arsenal",   f0 = sec(2, 55),  f1 = sec(3, 35),  q = "Can speed and steel win?" },
 	{ id = 8, name = "Hollow Purple",         f0 = sec(3, 35),  f1 = sec(4, 0),   q = "What happens when both forces meet?" },
-	{ id = 9, name = "Years later - Unlimited Void (epilogue)", f0 = sec(4, 0), f1 = sec(4, 20), q = "What does the strongest see?", epilogue = true },
+	{ id = 9,  name = "Adult Gojo: Infinity, Maximum Output Blue, movement", f0 = 7200, f1 = 8400, q = "What does the strongest do with a free hand?", adult = true },
+	{ id = 10, name = "Unlimited Void",                     f0 = 8400, f1 = 9300, q = "What does it feel like to be understood all at once?", adult = true },
+	{ id = 11, name = "Unlimited Void: the 0.2-second application", f0 = 9300, f1 = 9540, q = "How little time is enough?", adult = true },
+	{ id = 12, name = "Shibuya Toji: Playful Cloud",        f0 = 9540, f1 = 10290, q = "Who is in control of the body?", shibuya = true },
 }
 function D.chapterAt(frame) local c = D.chapters[1] for _, ch in ipairs(D.chapters) do if frame >= ch.f0 then c = ch end end return c end
 
@@ -55,9 +58,9 @@ G.pointHold = { pyaw = -22, twist = -10, lean = 4, rh = H(1.75, 0.2, 0.6) }
 G.dodgeA = { lean = -12, roll = 6, pyaw = -30, headYaw = 6, rh = H(0.1, 0.7, -0.9) }                                 -- minimal lean away
 G.dodgeB = { lean = 8, roll = -6, pyaw = 10, headYaw = -8 }
 G.hit = { lean = -22, crouch = 0.2, headPitch = -16, rh = H(0.3, 1.0, 0.0), lh = H(0.3, -1.0, 0.0), rp = H(0.0, 0.9, 0.0), lp = H(0.0, -0.9, 0.0) }
-G.down = { crouch = 1.45, lean = -16, pyaw = -14, headPitch = 12, lh = H(0.95, -0.55, -1.7), rh = H(0.4, 0.7, -1.2), rf = F(-0.3, 0.7), lf = F(0.7, -0.5) }  -- seated against the floor, left hand flat on a tile
-G.breathe1 = { lean = -14, crouch = 1.42 }
-G.breathe2 = { lean = -17, crouch = 1.48 }
+G.down = { crouch = 1.2, lean = -16, pyaw = -14, headPitch = 12, lh = H(0.95, -0.55, -1.7), rh = H(0.4, 0.7, -1.2), rf = F(-0.3, 0.7), lf = F(0.7, -0.5) }  -- seated against the floor, left hand flat on a tile
+G.breathe1 = { lean = -14, crouch = 1.18 }
+G.breathe2 = { lean = -17, crouch = 1.24 }
 G.rise1 = { crouch = 1.2, lean = 6, headPitch = 6, lh = H(0.9, -0.55, -1.4), rh = H(0.5, 0.7, -1.0) }
 G.rise2 = { crouch = 0.4, lean = 4, headPitch = 0, lh = H(0.1, -0.72, -1.0), rh = H(0.1, 0.72, -1.0) }
 G.red = { pyaw = -30, twist = -14, lean = -4, rh = H(1.6, 0.15, 0.7), rp = H(0.3, 0.4, 0.1) }                         -- palm out
@@ -257,12 +260,12 @@ Gj:add(1000, G.tilt)
 -- attempt 3: Toji changes direction midway and watches when Gojo turns
 Tj:add(1040, J.coil, { x = 3.0, ease = "in2" })
 Tj:add(1046, J.dash, { x = 3.0, ease = "in2" })
-Tj:add(1050, J.dash, { x = 5.2, z = 1.8, ease = "linear" })                   -- feints to the near side
-Tj:add(1055, J.strikeLoad, { x = 5.6, z = 1.8 })
+Tj:add(1050, J.dash, { x = 4.6, z = 2.8, ease = "linear" })                   -- feints to the near side
+Tj:add(1055, J.strikeLoad, { x = 5.0, z = 2.8 })
 Tj:add(1058, J.dash, { x = 7.8, z = -2.4, yaw = 20, ease = "linear" })        -- cuts back across behind Gojo's head
 Tj:add(1066, J.strike, { x = 8.4, z = -2.4, yaw = 20 })
 Tj:add(1100, J.watchHand, { x = 7.6, z = -2.0, yaw = 20 })
-Tj:add(1180, J.watchHand, { x = 6.4, z = -0.8, yaw = 10 })
+Tj:add(1180, J.watchHand, { x = 6.4, z = -2.3, yaw = 10 })
 Tj:add(1260, J.settle, { x = 5.0, z = -0.4, yaw = 0 })
 Tj:add(1380, J.settle, { x = 2.4, z = 0.2 })
 Tj:add(1499, J.loose, { x = 1.0, z = 0.2 })
@@ -292,9 +295,9 @@ Tj:add(1590, { J.crouchLow, { roll = 8 } }, { x = 0.6, z = 0.4 })              -
 Tj:add(1640, J.crouchLow, { x = -1.6, z = 0.4, ease = "linear" })              -- dragged toward the point; slab arrives
 Tj:add(1690, { J.coil, { crouch = 0.9 } }, { x = -2.2 })                       -- he steps onto the slab
 Tj:add(1700, J.dash, { x = -1.0, gy = 0.4, ease = "in2" })
-Tj:add(1708, J.air, { x = 3.0, gy = 2.3, ease = "linear" })                    -- rides the tilting slab upward
-Tj:add(1722, J.air, { x = 8.0, gy = 4.4, ease = "linear" })                    -- over Gojo
-Tj:add(1736, J.airSpear, { x = 11.2, gy = 4.0, ease = "in2" })
+Tj:add(1708, J.air, { x = 3.0, gy = 2.3, ease = "linear", lf = F(0.4, -0.4, 0.8), rf = F(-0.4, 0.5, 0.8) })                    -- rides the tilting slab upward
+Tj:add(1722, J.air, { x = 8.0, gy = 4.4, ease = "linear", lf = F(0.5, -0.4, 0.9), rf = F(-0.3, 0.5, 0.9) })                    -- over Gojo
+Tj:add(1736, J.airSpear, { x = 11.2, gy = 4.0, ease = "in2", lf = F(0.6, -0.4, 0.6), rf = F(-0.3, 0.5, 0.5) })
 Tj:add(1744, J.land, { x = 11.8, gy = 1.9, ease = "out2" })                    -- lands on the stair
 Tj:add(1770, J.settle, { x = 12.0 })
 Tj:add(1900, J.loose, { x = 13.5 })
@@ -405,10 +408,10 @@ Tj:add(5486, J.sweep, { x = 3.8, ease = "out2" })
 Tj:add(5530, J.settle, { x = 3.6 })
 Tj:add(5680, J.dash, { x = 8.0 })
 Tj:add(5686, J.strike, { x = 6.6, ease = "in2" })
-Tj:add(5700, J.land, { x = 5.0 })
-Tj:add(5780, J.pull, { x = 5.0 })                                               -- exchange 2: sudden return interrupts the approach
-Tj:add(5800, J.pull, { x = 4.0, ease = "in2" })
-Tj:add(5812, J.spearHold, { x = 4.0 })
+Tj:add(5700, J.land, { x = 6.8 })
+Tj:add(5780, J.pull, { x = 6.8 })                                               -- exchange 2: sudden return interrupts the approach
+Tj:add(5800, J.pull, { x = 6.2, ease = "in2" })
+Tj:add(5812, J.spearHold, { x = 6.2 })
 Tj:add(5950, J.coil, { x = 3.8, ease = "in2" })
 Tj:add(5956, J.air, { x = 7.0, gy = 2.0, ease = "in2" })                         -- exchange 3: airborne crossing, the chain divides the frame
 Tj:add(5966, J.airSpear, { x = 12.0, gy = 2.6, z = -0.3, ease = "linear" })
@@ -426,8 +429,8 @@ Gj:add(5474, G.dodgeA, { x = 6.0 })
 Gj:add(5486, G.sidestep, { x = 7.8, z = -0.5, ease = "out2" })
 Gj:add(5560, { G.watch, { headYaw = -20 } }, { x = 8.0 })
 Gj:add(5640, G.stand, { x = 6.4, z = 0.0 })                                       -- steps in: the return interrupts him
-Gj:add(5680, G.run, { x = 3.8 })
-Gj:add(5800, G.hit, { x = 4.8, ease = "out2" })
+Gj:add(5680, G.run, { x = 3.2 })
+Gj:add(5800, G.hit, { x = 3.6, ease = "out2" })
 Gj:add(5840, G.sidestep, { x = 7.2 })
 Gj:add(5950, { G.watch, { headYaw = -16 } }, { x = 7.0 })
 Gj:add(5976, G.dodgeA, { x = 9.4, ease = "out2" })
@@ -457,13 +460,70 @@ Tj:add(6960, J.stagger, { x = 2.0, ease = "out2" })
 Tj:add(7100, J.settle, { x = 1.4 })
 Tj:add(7199, J.loose, { x = 1.4 })
 
----------------------------------------------------------------------------------------------- EPILOGUE (7200-7799): adult Gojo, blindfold, Unlimited Void
+---------------------------------------------------------------------------------------------- ADULT GOJO CHAPTERS (7200-9539) and SHIBUYA TOJI (9540-10289)
+G.sign = { crouch = 0.1, lean = 2, rh = H(1.1, 0.15, 0.9), lh = H(1.0, -0.2, 0.85), rp = H(0.2, 0.4, 0.2), lp = H(0.2, -0.4, 0.2), pyaw = -10 }     -- the hand sign for the domain
+G.uncover = { lean = -2, rh = H(0.5, 0.4, 1.5), rp = H(0.0, 0.5, 0.6), headPitch = -4 }                                                              -- fingers at the blindfold
+G.blink = { crouch = 0.3, lean = 6 }
+J.slack = { crouch = 0.15, lean = 12, headPitch = 22, rh = H(0.1, 0.8, -1.2), lh = H(0.1, -0.8, -1.2) }                                               -- body without its owner
+J.takeover = { crouch = 0.3, lean = 0, headPitch = -6, rh = H(0.5, 0.7, -0.4), lh = H(0.5, -0.7, -0.4) }
+J.cloud = { crouch = 0.55, lean = 10, pyaw = -14, rh = H(1.0, 0.5, 0.2), lh = H(0.7, -0.6, 0.1) }                                                     -- Playful Cloud held in two hands
+J.cloudSwing = { crouch = 0.6, lean = 22, pyaw = 26, twist = 28, rh = H(1.9, 0.5, 0.4), lh = H(1.3, -0.4, 0.3) }
+J.cloudWind = { crouch = 0.7, lean = 8, pyaw = -34, twist = -26, rh = H(0.4, 0.9, 0.4), lh = H(0.5, -0.4, 0.3) }
+-- Gojo (adult): 7200 infinity filter / 7500 maximum-output Blue / 7950 spatial movement / 8400 unlimited void / 9300 the 0.2 s application
 Gj:add(7200, G.stand, { x = 6.0, z = 0.0, gy = 0, yaw = 0 })
-Gj:add(7400, { G.stand, { headPitch = -4 } })
-Gj:add(7500, { G.watch })
-Gj:add(7799, { G.stand })
-Tj:add(7200, J.loose, { x = -60.0, z = -60.0 })                                    -- Toji is not in the epilogue (parked far away)
-Tj:add(7799, J.loose, { x = -60.0, z = -60.0 })
+Gj:add(7300, { G.watch, { headYaw = -16 } })
+Gj:add(7344, { G.tilt })                                                      -- the stone stops; the leaf already passed through
+Gj:add(7440, G.shift)
+Gj:add(7500, G.stand)
+Gj:add(7560, G.pointHold, { ease = "out2" })
+Gj:add(7680, G.pointHold)
+Gj:add(7760, { G.pointHold, { lean = -6 } })
+Gj:add(7900, G.stand, { ease = "inout" })
+Gj:add(7980, G.stand, { x = 6.0 })
+Gj:add(8040, G.blink, { x = 6.0, ease = "in2" })                              -- short reposition: three studs in four frames
+Gj:add(8044, G.blink, { x = 9.0, ease = "out2" })
+Gj:add(8100, G.stand, { x = 9.0 })
+Gj:add(8140, G.stand, { x = -16.0, z = 0.0, lf = F(0.3, -0.45, 0), rf = F(-0.3, 0.55, 0) })     -- long-distance: departs at the gate ...
+Gj:add(8200, G.stand, { x = -16.0 })
+Gj:add(8203, G.blink, { x = 26.0, gy = 3.2, lf = F(0.3, -0.45, 0), rf = F(-0.3, 0.55, 0) })    -- ... arrives on the walkway
+Gj:add(8300, G.stand, { x = 26.0 })
+Gj:add(8399, G.stand, { x = 26.0 })
+Gj:add(8400, G.dodgeA, { x = 6.0, z = 0.0, gy = 0, lf = F(0.2, -0.45, 0), rf = F(-0.2, 0.5, 0) })   -- unlimited void: the action is already underway
+Gj:add(8440, G.dodgeB, { x = 6.0 })
+Gj:add(8480, G.uncover, { ease = "out2" })
+Gj:add(8540, G.uncover)
+Gj:add(8570, G.sign, { ease = "out2" })
+Gj:add(9040, G.sign)
+Gj:add(9060, G.stand, { ease = "out2" })                                       -- the domain releases
+Gj:add(9200, { G.uncover, { rh = H(0.6, 0.4, 1.3) } }, { ease = "inout" })
+Gj:add(9299, G.stand)
+Gj:add(9300, G.stand, { x = 6.0 })
+Gj:add(9390, G.stand)
+Gj:add(9412, G.sign, { ease = "in2" })                                         -- the 0.2 s application: anticipation, six frames, aftermath
+Gj:add(9426, G.sign)
+Gj:add(9440, G.stand, { ease = "out2" })
+Gj:add(9539, G.tilt)
+Gj:add(9540, G.stand, { x = -70.0, z = -60.0 })                                -- parked while Shibuya Toji has the stage
+Gj:add(10289, G.stand, { x = -70.0, z = -60.0 })
+Tj:add(7200, J.loose, { x = -60.0, z = -60.0 })                                -- parked through the adult chapters
+Tj:add(9539, J.loose, { x = -60.0, z = -60.0 })
+Tj:add(9540, J.slack, { x = -12.0, z = 0.0 })                                  -- Shibuya: the body stands slack, mist gathers
+Tj:add(9660, J.slack, { x = -12.0 })
+Tj:add(9690, J.takeover, { x = -12.0, ease = "out2" })                          -- the soul takes control: head lifts, eyes snap open
+Tj:add(9750, J.cloud, { x = -12.0 })
+Tj:add(9800, J.coil, { x = -12.0, ease = "in2" })
+Tj:add(9806, J.dash, { x = -11.0, ease = "in3" })
+Tj:add(9814, J.cloudSwing, { x = 3.2, z = 0.3, ease = "linear" })              -- speed across the water
+Tj:add(9820, J.cloudSwing, { x = 3.6, ease = "out3" })
+Tj:add(9880, J.cloud, { x = 3.0 })
+Tj:add(9960, J.cloudWind, { x = 3.0, ease = "in2" })
+Tj:add(9968, J.cloudSwing, { x = 3.6, z = 0.0, ease = "in3" })
+Tj:add(10040, J.cloud, { x = 3.0 })
+Tj:add(10100, J.dash, { x = -4.0, z = 1.0 })
+Tj:add(10106, J.air, { x = 0.0, z = 0.6, gy = 1.6, ease = "linear" })
+Tj:add(10116, J.cloudSwing, { x = 6.0, z = 0.0, gy = 0.0, ease = "in3" })
+Tj:add(10200, J.cloud, { x = 5.0 })
+Tj:add(10289, J.loose, { x = 5.0 })
 
 ---------------------------------------------------------------------------------------------- contacts (solved by BGEngine.bake)
 D.contacts = {
@@ -476,7 +536,7 @@ D.eyes = {
 	Blue = { { f = 0, x = 0, y = 0 }, { f = 50, x = 0, y = 0 }, { f = 58, x = -0.075, y = 0 }, { f = 300, x = -0.075, y = 0 }, { f = 1058, x = 0.07, y = 0 },
 		{ f = 1400, x = -0.05, y = 0 }, { f = 2680, x = -0.075, y = 0.02 }, { f = 3800, x = 0, y = 0 }, { f = 3880, x = 0.0, y = 0 },
 		{ f = 4330, x = -0.075, y = 0 }, { f = 7000, x = 0, y = 0 }, { f = 7199, x = 0, y = -0.03 } },
-	Purple = { { f = 0, x = 0, y = 0 }, { f = 4040, x = 0, y = 0 }, { f = 4052, x = 0.06, y = 0 }, { f = 4150, x = 0, y = 0 } },
+	Purple = { { f = 0, x = 0, y = 0 }, { f = 4040, x = 0, y = 0 }, { f = 4052, x = 0.06, y = 0 }, { f = 4150, x = 0, y = 0 }, { f = 9660, x = 0, y = 0.08 }, { f = 9692, x = 0, y = 0 } },
 }
 
 ---------------------------------------------------------------------------------------------- camera
@@ -569,17 +629,42 @@ D.camera = {
 	cam(7121, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "8 Gojo's expression" }),
 	cam(7199, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 18),
 	-- epilogue
-	cam(7200, { 6.0, 3.4, 14.0 }, { 6.0, 3.0, 0 }, 42, { cut = true, name = "9 Years later" }),
-	cam(7400, { 6.0, 3.4, 11.0 }, { 6.0, 3.0, 0 }, 38),
-	cam(7401, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 one eye revealed" }),
-	cam(7520, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
-	cam(7521, { 6.0, 3.6, 16.0 }, { 6.0, 3.0, 0 }, 50, { cut = true, name = "9 the field" }),
-	cam(7690, { 6.0, 3.6, 13.0 }, { 6.0, 3.0, 0 }, 46),
-	cam(7691, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 same eye framing as the awakening" }),
-	cam(7799, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
 }
+local function addCams(list) for _, c in ipairs(list) do table.insert(D.camera, c) end end
+addCams({
+	cam(2440, rel("Purple", -1.5, -0.2, 2.4), rel("Purple", -0.8, -0.3, 0), 20, { cut = true, name = "4 the curse opens its mouth" }),
+	cam(2496, { 21.0, 5.4, 14.0 }, { 22.5, 4.4, 0 }, 42, { cut = true, name = "4 walkway (spear out)" }),
+	cam(7200, { 6.0, 3.4, 13.0 }, { 6.0, 3.0, 0 }, 40, { cut = true, name = "9 Infinity filters two objects" }),
+	cam(7335, rel("Blue", -1.6, -0.2, 2.0), rel("Blue", -0.8, 0.0, 0), 24, { cut = true, name = "9 the stone stops" }),
+	cam(7420, { 6.0, 3.4, 13.0 }, { 6.0, 3.0, 0 }, 40, { cut = true }),
+	cam(7500, { 0.0, 7.0, 32.0 }, { 0.0, 2.0, 0 }, 60, { cut = true, name = "9 Maximum Output Blue (wide)" }),
+	cam(7899, { 0.0, 7.0, 32.0 }, { 0.0, 2.0, 0 }, 60),
+	cam(7900, { 7.0, 3.4, 13.0 }, { 7.0, 3.0, 0 }, 40, { cut = true, name = "9 reposition" }),
+	cam(8110, { 5.0, 7.0, 44.0 }, { 5.0, 3.0, 0 }, 56, { cut = true, name = "9 long transport: gate to walkway" }),
+	cam(8399, { 5.0, 7.0, 44.0 }, { 5.0, 3.0, 0 }, 56),
+	cam(8400, { 6.0, 3.6, 14.0 }, { 7.0, 3.0, 0 }, 40, { cut = true, name = "10 Unlimited Void: action underway" }),
+	cam(8480, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "10 uncovering his eyes" }),
+	cam(8566, rel("Blue", -1.0, -0.8, -2.6), rel("Blue", -0.3, -0.7, 0), 22, { cut = true, name = "10 the hand sign" }),
+	cam(8620, { 8.0, 9.0, 36.0 }, { 8.0, 3.0, 0 }, 55, { cut = true, name = "10 the barrier closes (wide)" }),
+	cam(8700, { 6.0, 3.6, 11.0 }, { 8.0, 3.2, 0 }, 40, { cut = true, name = "10 inside the domain" }),
+	cam(8830, { 5.0, 3.0, 8.0 }, { 6.0, 3.6, 0 }, 34),
+	cam(8900, { 10.4, 3.4, 0.4 }, { 6.0, 3.4, 0 }, 50, { cut = true, name = "10 the opponent's view" }),
+	cam(9050, { 8.0, 6.0, 34.0 }, { 8.0, 3.0, 0 }, 55, { cut = true, name = "10 release (outside)" }),
+	cam(9200, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "10 the same eye framing" }),
+	cam(9300, { 6.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { cut = true, name = "11 the 0.2 s application: setup" }),
+	cam(9395, rel("Blue", -1.0, -0.8, -2.6), rel("Blue", -0.3, -0.7, 0), 22, { cut = true, name = "11 hands" }),
+	cam(9418, { 8.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { cut = true, name = "11 six frames" }),
+	cam(9432, { 8.0, 4.0, 22.0 }, { 8.0, 3.0, 0 }, 46, { name = "11 aftermath" }),
+	cam(9540, { -4.0, 4.0, 22.0 }, { -2.0, 2.0, 0 }, 50, { cut = true, name = "12 Shibuya: the body" }),
+	cam(9760, rel("Purple", 0.5, 0.1, 2.2), rel("Purple", 0, 0, 0), 22, { cut = true, name = "12 eyes snap open" }),
+	cam(9790, { -2.0, 4.0, 24.0 }, { 0.0, 2.0, 0 }, 52, { cut = true, name = "12 speed across the water" }),
+	cam(9960, { 2.0, 3.6, 16.0 }, { 3.5, 2.6, 0 }, 44, { cut = true, name = "12 Playful Cloud: sweep" }),
+	cam(10095, { 0.0, 4.2, 22.0 }, { 1.5, 2.4, 0 }, 50, { cut = true, name = "12 leap" }),
+	cam(10200, { 3.0, 3.6, 16.0 }, { 5.0, 2.6, 0 }, 44, { cut = true, name = "12 finish" }),
+})
+table.sort(D.camera, function(a, b) return a.f < b.f end)
 D.shake = { { f = 159, amp = 0.35, frames = 5 }, { f = 1744, amp = 0.3, frames = 5 }, { f = 2722, amp = 0.35, frames = 5 }, { f = 4342, amp = 0.4, frames = 6 }, { f = 6900, amp = 0.6, frames = 8 } }
-D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 } }      -- the first Infinity stop, and the beat before Purple
+D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 }, { f0 = 9414, f1 = 9440, scale = 0.2 } }      -- the first Infinity stop, and the beat before Purple
 
 ---------------------------------------------------------------------------------------------- state as functions of frame
 function D.glassesState(f)       -- "face" | "flying" | "step" | "settling" | "settled" | "none"
@@ -590,7 +675,7 @@ function D.glassesState(f)       -- "face" | "flying" | "step" | "settling" | "s
 	if f < 7125 then return "settling" end
 	return "settled"
 end
-function D.spearVisible(f) return (f >= 2490 and f < 3460) or (f >= 4330 and f < 7200) end
+function D.spearVisible(f) return (f >= 2494 and f < 3460) or (f >= 4330 and f < 7200) end
 function D.chainVisible(f) return f >= 5340 and f < 6449 end
 function D.curseUncoiled(f) return f >= 2450 and f < 3460 or f >= 5300 and f < 6449 end
 
@@ -606,21 +691,29 @@ D.fx = {
 	red = { f0 = 4342, f1 = 4372, point = { -5.2, 2.0, 0.3 } },
 	chain = { f0 = 5340, f1 = 6449 },
 	purple = { blue0 = 6530, red0 = 6600, merge = 6820, release = 6900, beam1 = 7010, laneZ = 0.0 },
-	void = { f0 = 7440, f1 = 7799 },
+	filter = { leaf = { f0 = 7230, f1 = 7330 }, stone = { f0 = 7300, f1 = 7480 } },
+	maxBlue = { f0 = 7560, f1 = 7900, point = { 0.0, 7.0, 0.0 }, radius = 26 },
+	blink = { { f = 8040, to = { 9.0, 0 } }, { f = 8203, to = { 26.0, 3.2 } } },
+	curtain = { f0 = 8240, f1 = 8399 },
+	emerge = { f0 = 2440, f1 = 2494 },
+	uv = { f0 = 8400, closeStart = 8620, closeEnd = 8700, inside0 = 8700, opp0 = 8900, release = 9050, restored = 9200 },
+	uv02 = { f = 9420, frames = 6 },
+	water = { f0 = 9540, f1 = 10289 },
+	construct = { { f0 = 8400, f1 = 9300, x = 10.0 }, { f0 = 9300, f1 = 9540, x = 10.5 }, { f0 = 9740, f1 = 10289, x = 9.0 } },
 }
 D.sound = {  -- cues (ids in D.soundIds; blank = silence). music is a separate envelope
 	{ f = 30, cue = "glass_shadow" }, { f = 158, cue = "burst" }, { f = 625, cue = "pebble_stop" }, { f = 909, cue = "infinity_stop" },
 	{ f = 1560, cue = "blue" }, { f = 1745, cue = "land" }, { f = 2716, cue = "spear_fold" }, { f = 4045, cue = "footstep" },
-	{ f = 4342, cue = "red" }, { f = 5474, cue = "chain" }, { f = 6900, cue = "purple" }, { f = 7125, cue = "glasses" }, { f = 7440, cue = "void" },
+	{ f = 4342, cue = "red" }, { f = 2444, cue = "curse_open" }, { f = 7340, cue = "infinity_stop" }, { f = 7560, cue = "blue" }, { f = 8203, cue = "transport" }, { f = 8620, cue = "barrier" }, { f = 8700, cue = "void_in" }, { f = 9050, cue = "void_out" }, { f = 9420, cue = "void_flash" }, { f = 9692, cue = "seance" }, { f = 9814, cue = "splash" }, { f = 5474, cue = "chain" }, { f = 6900, cue = "purple" }, { f = 7125, cue = "glasses" }, { f = 7440, cue = "void" },
 }
 D.soundIds = {
 	burst = "rbxasset://sounds/swordlunge.wav", land = "rbxasset://sounds/impact_water.mp3", spear_fold = "rbxasset://sounds/impact_explosion_03.mp3",
 	blue = "rbxasset://sounds/bass.mp3", red = "rbxasset://sounds/swordslash.wav", chain = "rbxasset://sounds/swordslash.wav", purple = "rbxasset://sounds/impact_explosion_03.mp3",
 	footstep = "rbxasset://sounds/snap.mp3", infinity_stop = "rbxasset://sounds/electronicpingshort.wav", pebble_stop = "rbxasset://sounds/electronicpingshort.wav",
-	glasses = "rbxasset://sounds/snap.mp3", void = "rbxasset://sounds/bass.mp3", glass_shadow = "",
+	glasses = "rbxasset://sounds/snap.mp3", void = "rbxasset://sounds/bass.mp3", curse_open = "rbxasset://sounds/impact_water.mp3", transport = "rbxasset://sounds/swordlunge.wav", barrier = "rbxasset://sounds/bass.mp3", void_in = "rbxasset://sounds/bass.mp3", void_out = "rbxasset://sounds/impact_explosion_03.mp3", void_flash = "rbxasset://sounds/electronicpingshort.wav", seance = "rbxasset://sounds/bass.mp3", splash = "rbxasset://sounds/impact_water.mp3", glass_shadow = "",
 }
 D.music = {  -- master volume envelope (frame, volume): music drops for the awakening, falls silent for Purple's aftermath
-	{ 0, 0.5 }, { 3420, 0.5 }, { 3450, 0 }, { 4090, 0 }, { 4200, 0.5 }, { 6850, 0.5 }, { 6860, 0 }, { 7120, 0 }, { 7200, 0.4 }, { 7799, 0.4 },
+	{ 0, 0.5 }, { 3420, 0.5 }, { 3450, 0 }, { 4090, 0 }, { 4200, 0.5 }, { 6850, 0.5 }, { 6860, 0 }, { 7120, 0 }, { 7200, 0.4 }, { 8690, 0.4 }, { 8700, 0.05 }, { 9040, 0.05 }, { 9060, 0.5 }, { 9412, 0.5 }, { 9418, 0 }, { 9434, 0 }, { 9450, 0.5 }, { 10289, 0.5 },
 }
 
 ---------------------------------------------------------------------------------------------- engine data

@@ -40,7 +40,22 @@ Older story/showcase Scripts and LocalScripts are disabled by the installer, not
 Playable: **WASD** move (W = toward the opponent) | **LMB** combo | **Q E R C** skills | **hold F** guard | **G** counter / riposte | **X** first form (50%) | **Z** final form (100%) | **T** ultimate | **Tab** playable <-> cinematic.
 Cinematic: see "Controls (cinematic)" in the duel section.
 
-## The Gojo vs Toji duel (teen Gojo, Hidden Inventory look; original choreography, models, animation)
+## Full cut: the teen duel (0:00-4:00) + adult Gojo + Unlimited Void + Shibuya Toji (to 5:43)
+Full Replay (`R`) plays everything in order, with effects ON by default, so **Unlimited Void plays automatically** at 4:40 (frames 8400-9300), followed by the 0.2-second application at 5:10 (domain frames 9420-9425) and Shibuya Toji at 5:18. Total 10,290 frames = 343.0 s.
+Chapter keys: `1-9`, `0` (10), `-` (11), `=` (12); `[` `]` previous / next. 10 = Unlimited Void, 11 = its 0.2 s application, 12 = Shibuya Toji.
+Chapters: 1 Who moved first? | 2 Infinity | 3 Blue | 4 Toji takes control (the curse opens its mouth in a close-up and draws the spear out) | 5 Awakening | 6 Red | 7 Toji's full arsenal | 8 Hollow Purple | 9 Adult Gojo: Infinity filtering (leaf passes, stone stops), Maximum Output Blue (wide), short reposition + long transport, curtain | 10 Unlimited Void (action underway, eyes uncovered, hand sign, barrier closes in a wide shot, interior with a distant light and three layers of streams, the opponent's stalled view, release, same eye framing) | 11 the 0.2-second application | 12 Shibuya Toji (slack body, eyes snap open, Playful Cloud, water rings, construct knocked back).
+`ABILITIES.md` is the ability-to-timestamp checklist with per-row status. **The anime source audit was not done and no row is visually verified.** Not built: Split Soul Katana, ordinary blade, handgun, and the subjective Six-Eyes POV shot.
+
+### The white rectangle with a black star
+Not reproduced here (no Studio, and I cannot see your screenshot). Isolate it in the running place: pause on the shot and press **X** repeatedly; each press hides one category (effect parts, particle emitters, decals / textures / SurfaceGuis, ForceField and Glass parts, Neon parts, all courtyard geometry) and prints how many instances it hid. When the rectangle vanishes, that category owns it. Pressing X past the last category restores everything and prints a `[SHOT AUDIT]` list of large flat pale parts, textured parts and wide emitters with their paths.
+Likely suspect I removed: the Infinity-stop and fold discs used the `ForceField` material, whose pattern can look like a pale rectangle with a dark graphic when seen edge-on. They are now plain translucent parts. If the rectangle persists, the audit names the real owner.
+
+### Character rebuild (all unverified visually)
+Gojo: one continuous white hair mass over a darker grey underside, locks built from three tapering segments, the collar lowered so the jaw shows, bright small irises, folds as lighter lines on sleeves and trousers. Toji: shoulders widened to 2.9 studs, black fringe with an irregular lower edge, a lighter shirt tone so folds read, and a curse with a lighter distinct head, a hinged lower jaw with a dark mouth interior and teeth, band-segmented body and a tapered tail.
+No custom meshes or face textures are used (none available here): a sculpted Gojo hair mesh and face decals for both are the assets that would improve the likeness most.
+Fixed offline: the chapter-3 leap miss (0.59 to 0.24), the seated foot penetration (0.31 to 0.14), wrist-in-torso frames (chapter 2: 16 to 4, chapter 7: 21 to 3). The leftovers are small and listed in the test output.
+
+## Teen duel details (teen Gojo, Hidden Inventory look; original choreography, models, animation)
 **Status: written and checked offline only. Nothing here has run in Studio yet. Read "Not verified" below.**
 One timeline, `BGDuel.lua`: 30 fps, frames 0-7199 = the 4:00 duel in 8 chapters, 7200-7799 = the optional 0:20 epilogue. Poses are macros and footwork is generated
 (a footstep every ~0.9 studs, dash trails, plants). Chapters, camera shots, effects, costume states (glasses / spear / chain / tiles), sound cues, the music envelope and
