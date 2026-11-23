@@ -696,7 +696,7 @@ D.fx = {
 	blink = { { f = 8040, to = { 9.0, 0 } }, { f = 8203, to = { 26.0, 3.2 } } },
 	curtain = { f0 = 8240, f1 = 8399 },
 	emerge = { f0 = 2440, f1 = 2494 },
-	uv = { f0 = 8400, closeStart = 8620, closeEnd = 8700, inside0 = 8700, opp0 = 8900, release = 9050, restored = 9200 },
+	uv = { f0 = 8400, f1 = 9300, closeStart = 8620, closeEnd = 8700, inside0 = 8700, opp0 = 8900, release = 9050, restored = 9200 },
 	uv02 = { f = 9420, frames = 6 },
 	water = { f0 = 9540, f1 = 10289 },
 	construct = { { f0 = 8400, f1 = 9300, x = 10.0 }, { f0 = 9300, f1 = 9540, x = 10.5 }, { f0 = 9740, f1 = 10289, x = 9.0 } },

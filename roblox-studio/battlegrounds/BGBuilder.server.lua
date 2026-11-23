@@ -20,6 +20,15 @@ end
 local stage = Instance.new("Folder")
 stage.Name = "Showcase"
 stage.Parent = Workspace
+-- the place's default SpawnLocation pad (12x1x12 with a logo decal) sits at the origin, inside the courtyard: it reads as a stray white rectangle with a dark graphic
+local defaultSpawn = Workspace:FindFirstChild("SpawnLocation")
+if defaultSpawn and defaultSpawn:IsA("BasePart") then
+	defaultSpawn.Transparency = 1
+	defaultSpawn.CanCollide = false
+	for _, d in ipairs(defaultSpawn:GetDescendants()) do
+		if d:IsA("Decal") or d:IsA("Texture") then d.Transparency = 1 end
+	end
+end
 
 local BLUE = Data.colors.blue          -- electric blue
 local CYAN = Color3.fromRGB(70, 215, 255)
