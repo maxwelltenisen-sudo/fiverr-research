@@ -476,9 +476,12 @@ local function updateConstruct(f)
 	end
 end
 -- the domain: far luminous centre + layered streams that keep accumulating
-local centerBall = mk(Enum.PartType.Ball, Vector3.new(4, 4, 4), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, 1)
+local centerBall = mk(Enum.PartType.Ball, Vector3.new(10, 10, 10), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, 1)
+local centerLight = Instance.new("PointLight"); centerLight.Range, centerLight.Brightness, centerLight.Color, centerLight.Shadows = 60, 3, Color3.fromRGB(210, 225, 255), false; centerLight.Parent = centerBall
+local halos = {}
+for i = 1, 3 do halos[i] = mk(Enum.PartType.Cylinder, Vector3.new(0.2, 18 + i * 10, 18 + i * 10), (i == 2) and Color3.fromRGB(190, 110, 255) or Color3.fromRGB(110, 170, 255), Enum.Material.Neon, 1) end
 local streams = {}
-for i = 1, 260 do
+for i = 1, 420 do
 	local layer = (i % 3) + 1
 	local col = ({ Color3.fromRGB(90, 160, 255), Color3.fromRGB(240, 244, 255), Color3.fromRGB(185, 110, 255), Color3.fromRGB(255, 140, 170) })[rng:NextInteger(1, 4)]
 	streams[i] = { part = mk(nil, Vector3.new(0.05 * layer, 0.05 * layer, 1.5 + layer * 1.6), col, Enum.Material.Neon, 1), layer = layer,
@@ -492,6 +495,8 @@ local function updateDomain(f)
 		if d:IsA("BasePart") and not d:GetAttribute("Invisible") and d.Name ~= "PillarJag" then d.Transparency = (f >= D.fx.water.f0) and 1 or k end
 	end
 	local dark = math.min(1, uvK(f) + (f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames and 1 or 0))
+	local bl = Lighting:FindFirstChildOfClass("BloomEffect")
+	if bl and mode() == "Cinematic" and not state.neutral then bl.Intensity = 0.2 + 0.9 * dark; bl.Threshold = 2.0 - 1.1 * dark; bl.Size = 12 + 20 * dark end
 	if mode() == "Cinematic" and not state.neutral then
 		Lighting.Ambient = DUSK.amb:Lerp(Color3.fromRGB(8, 8, 14), dark)
 		Lighting.OutdoorAmbient = DUSK.out:Lerp(Color3.fromRGB(8, 8, 14), dark)
@@ -509,13 +514,18 @@ local function updateDomain(f)
 	local inside = state.fx and (uvK(f) > 0.5 or (f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames))
 	centerBall.Transparency = inside and 0.05 or 1
 	centerBall.Position = Vector3.new(8, 4, -46)
+	centerBall.Size = Vector3.new(10 + math.sin(f * 0.12) * 1.5, 10 + math.sin(f * 0.12) * 1.5, 10 + math.sin(f * 0.12) * 1.5)
+	for i, h in ipairs(halos) do
+		h.Transparency = inside and 0.45 or 1
+		h.CFrame = CFrame.new(centerBall.Position) * CFrame.Angles(f * 0.01 * i, f * 0.007 * (4 - i), math.rad(90))
+	end
 	local grow = clamp01(((f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames) and 330 or (f - u.inside0)) / 330)
-	local nShow = math.floor(40 + 220 * grow)                       -- information keeps accumulating while the opponent is stalled
+	local nShow = math.floor(60 + 360 * grow)                       -- information keeps accumulating while the opponent is stalled
 	local rateMul = (f >= u.opp0 and f < u.release) and 1.8 or 1
 	for i, s in ipairs(streams) do
 		if not inside or i > nShow then s.part.Transparency = 1
 		else
-			s.part.Transparency = 0.1 + 0.1 * s.layer
+			s.part.Transparency = 0.02 + 0.05 * s.layer
 			local z = ((s.z0 + (f / 30) * s.speed * rateMul * s.layer * 0.8) % 80) - 62                    -- three depth layers at different speeds
 			s.part.CFrame = CFrame.new(8 + s.x * (0.4 + 0.3 * s.layer), s.y * 0.7 + 3, z)
 		end
@@ -653,6 +663,15 @@ local function musicAt(f)
 end
 local events = {}
 for _, s in ipairs(D.sound) do table.insert(events, s) end
+local function bigRing(pos, color, d, dur) Style.ringSlash(pos, color, d, 90, dur, 0); Style.ringSlash(pos, Color3.new(1, 1, 1), d * 0.7, 90, dur * 0.8, 0) end
+local function addFn(f, fn) table.insert(events, { f = f, fn = fn }) end
+addFn(8620, function() if state.fx then Style.flash(Color3.fromRGB(180, 210, 255), 0.25, 0.5); bigRing(Vector3.new(7, 0.2, 0), Color3.fromRGB(120, 170, 255), 60, 0.7) end end)          -- the barrier starts to close
+addFn(8700, function() if state.fx then Style.ink(0.6); Style.speedLines(Color3.fromRGB(190, 220, 255), 0.5, 34); Style.flash(Color3.new(1, 1, 1), 0.2, 0.8) end end)                       -- the camera goes inside
+addFn(9050, function() if state.fx then
+	Style.ink(0.7); Style.flash(Color3.new(1, 1, 1), 0.35, 0.9); Style.speedLines(Color3.fromRGB(190, 160, 255), 0.5, 36)
+	bigRing(Vector3.new(7, 0.2, 0), Color3.fromRGB(190, 150, 255), 90, 0.9); Style.shards(Vector3.new(7, 4, 0), Color3.fromRGB(210, 190, 255), 30, 18); Style.crack(Vector3.new(7, 0, 0), Color3.fromRGB(190, 150, 255), 18, 14)   -- release: shockwave, shards, cracks
+end end)
+addFn(9420, function() if state.fx then Style.flash(Color3.new(1, 1, 1), 0.3, 1.0); Style.speedLines(Color3.new(1, 1, 1), 0.3, 40); bigRing(Vector3.new(8, 0.2, 0), Color3.fromRGB(200, 220, 255), 50, 0.5) end end)   -- the 0.2 s application
 table.sort(events, function(a, b) return a.f < b.f end)
 
 ---------------------------------------------------------------- camera
@@ -785,7 +804,10 @@ RunService:BindToRenderStep("BGDuelPose", Enum.RenderPriority.Camera.Value - 1, 
 	-- one-shots
 	if f < state.lastFrame then resetEvents(f) end
 	while state.evIdx <= #events and events[state.evIdx].f <= f do
-		if events[state.evIdx].f > state.lastFrame then playCue(events[state.evIdx].cue) end
+		if events[state.evIdx].f > state.lastFrame then
+			local ev = events[state.evIdx]
+			if ev.fn then pcall(ev.fn) else playCue(ev.cue) end
+		end
 		state.evIdx += 1
 	end
 	state.lastFrame = f

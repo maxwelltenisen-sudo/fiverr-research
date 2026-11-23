@@ -663,7 +663,7 @@ addCams({
 	cam(10200, { 3.0, 3.6, 16.0 }, { 5.0, 2.6, 0 }, 44, { cut = true, name = "12 finish" }),
 })
 table.sort(D.camera, function(a, b) return a.f < b.f end)
-D.shake = { { f = 159, amp = 0.35, frames = 5 }, { f = 1744, amp = 0.3, frames = 5 }, { f = 2722, amp = 0.35, frames = 5 }, { f = 4342, amp = 0.4, frames = 6 }, { f = 6900, amp = 0.6, frames = 8 } }
+D.shake = { { f = 8620, amp = 0.5, frames = 10 }, { f = 8700, amp = 1.2, frames = 14 }, { f = 9050, amp = 1.6, frames = 16 }, { f = 9420, amp = 1.4, frames = 8 }, { f = 9968, amp = 0.8, frames = 8 }, { f = 159, amp = 0.35, frames = 5 }, { f = 1744, amp = 0.3, frames = 5 }, { f = 2722, amp = 0.35, frames = 5 }, { f = 4342, amp = 0.4, frames = 6 }, { f = 6900, amp = 0.6, frames = 8 } }
 D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 }, { f0 = 9414, f1 = 9440, scale = 0.2 } }      -- the first Infinity stop, and the beat before Purple
 
 ---------------------------------------------------------------------------------------------- state as functions of frame
