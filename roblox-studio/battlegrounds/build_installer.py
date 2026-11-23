@@ -11,14 +11,14 @@ FILES = [  # (parent, class, name, file)
     ("RS", "ModuleScript", "BGRig", "BGRig.lua"),
     ("RS", "ModuleScript", "BGStyle", "BGStyle.lua"),
     ("RS", "ModuleScript", "BGCinematicData", "BGCinematicData.lua"),
-    ("RS", "ModuleScript", "BGTimeline", "BGTimeline.lua"),
+    ("RS", "ModuleScript", "BGDuel", "BGDuel.lua"),
     ("RS", "ModuleScript", "BGLook", "BGLook.lua"),
     ("SSS", "Script", "BGBuilder", "BGBuilder.server.lua"),
     ("SSS", "Script", "BGServer", "BGServer.server.lua"),
     ("SP", "LocalScript", "BGClient", "BGClient.client.lua"),
-    ("SP", "LocalScript", "BGCine", "BGCine.client.lua"),
+    ("SP", "LocalScript", "BGDuelPlayer", "BGDuelPlayer.client.lua"),
 ]
-head = '''-- ONE-PASTE INSTALLER: Kael vs Ren battlegrounds showcase.
+head = '''-- ONE-PASTE INSTALLER: teen Gojo vs Toji four-minute fan duel (+ the playable battlegrounds mode).
 -- Paste this whole file into Roblox Studio's Command Bar (View > Command Bar) or the Output window's command line, press Enter.
 -- Creates 10 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
 -- Your older story / showcase scripts are DISABLED, not deleted (re-enable them in Properties if you want them back).

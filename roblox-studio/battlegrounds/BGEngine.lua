@@ -130,7 +130,7 @@ end
 function Engine.solve(R, P)
 	local j = R.j
 	local out = { rot = {}, cf = {}, piv = {}, miss = {} }
-	local hipPivotY = R.hipStand - P.crouch
+	local hipPivotY = R.hipStand - P.crouch + (P.gy or 0)
 	local ltY = hipPivotY - j.RightHip.c0.Position.Y
 	local LT = CF.new(P.rx, ltY, P.rz) * CF.Angles(0, rad(P.yaw + P.pyaw), 0)
 	out.cf.LowerTorso = LT
@@ -239,7 +239,7 @@ local function bakeFeet(track)
 			if k.explicit[key] then
 				local s = k[key]
 				local w = b:PointToWorldSpace(V3.new(s.s, 0, -s.f))
-				k["w" .. side] = V3.new(w.X, s.lift or 0, w.Z)
+				k["w" .. side] = V3.new(w.X, (k.gy or 0) + (s.lift or 0), w.Z)
 			else
 				k["w" .. side] = last[side]
 			end
@@ -264,14 +264,14 @@ function Engine.eval(R, track, t)
 	local u = 0
 	if b ~= a and b.t > a.t then u = clamp((t - a.t) / (b.t - a.t), 0, 1) end
 	local e = EASE[b.ease](u)
-	local function n(f) return lerp(a[f], b[f], e) end
+	local function n(f) return lerp(a[f] or 0, b[f] or 0, e) end
 	local P = {
 		rx = n("px"), rz = n("pz"), yaw = track.def.baseYaw + n("yaw"), pyaw = n("pyaw"),
 		crouch = n("crouch"), lean = n("lean"), twist = n("twist"), roll = n("roll"),
-		headYaw = n("headYaw"), headPitch = n("headPitch"),
+		headYaw = n("headYaw"), headPitch = n("headPitch"), gy = n("gy"),
 	}
 	local body = bodyCF(P.rx, P.rz, P.yaw)
-	local chestY = R.chestStand - P.crouch
+	local chestY = R.chestStand - P.crouch + P.gy
 	local function hand(spec, pspec)
 		return {
 			t = body:PointToWorldSpace(V3.new(spec.s, chestY + spec.y, -spec.f)),
@@ -299,7 +299,7 @@ local function setHandLocal(track, keyIdx, side, worldPoint)
 	local k = track.keys[keyIdx]
 	local b = bodyCF(k.px, k.pz, track.def.baseYaw + k.yaw)
 	local l = b:PointToObjectSpace(worldPoint)
-	local spec = { f = -l.Z, s = l.X, y = l.Y - (track.R.chestStand - k.crouch) }
+	local spec = { f = -l.Z, s = l.X, y = l.Y - (track.R.chestStand - k.crouch + (k.gy or 0)) }
 	k[side:lower() .. "h"] = spec
 	-- keep following keys that inherited the old value in sync is the data author's job
 end
@@ -354,7 +354,8 @@ function Engine.bake(R, data)
 			-- attacker's fist stops `gap` studs short of the defender's open palm (the impossible stop)
 			bakeFeet(att)
 			local P = Engine.eval(R, def_, c.t)
-			local palm = P.hands[c.dhand].t
+			local palm
+			if c.dpart == "head" then palm = Engine.solve(R, P).cf.Head.Position + V3.new(0, c.dy or 0, 0) else palm = P.hands[c.dhand].t end
 			local k = att.keys[ai]
 			local nn = flat(V3.new(k.px - palm.X, 0, k.pz - palm.Z)).Unit
 			Hc = palm + nn * (c.gap + c.fist)

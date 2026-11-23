@@ -1,4 +1,4 @@
--- ONE-PASTE INSTALLER: Kael vs Ren battlegrounds showcase.
+-- ONE-PASTE INSTALLER: teen Gojo vs Toji four-minute fan duel (+ the playable battlegrounds mode).
 -- Paste this whole file into Roblox Studio's Command Bar (View > Command Bar) or the Output window's command line, press Enter.
 -- Creates 10 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
 -- Your older story / showcase scripts are DISABLED, not deleted (re-enable them in Properties if you want them back).
@@ -155,7 +155,7 @@ end
 function Engine.solve(R, P)
 	local j = R.j
 	local out = { rot = {}, cf = {}, piv = {}, miss = {} }
-	local hipPivotY = R.hipStand - P.crouch
+	local hipPivotY = R.hipStand - P.crouch + (P.gy or 0)
 	local ltY = hipPivotY - j.RightHip.c0.Position.Y
 	local LT = CF.new(P.rx, ltY, P.rz) * CF.Angles(0, rad(P.yaw + P.pyaw), 0)
 	out.cf.LowerTorso = LT
@@ -264,7 +264,7 @@ local function bakeFeet(track)
 			if k.explicit[key] then
 				local s = k[key]
 				local w = b:PointToWorldSpace(V3.new(s.s, 0, -s.f))
-				k["w" .. side] = V3.new(w.X, s.lift or 0, w.Z)
+				k["w" .. side] = V3.new(w.X, (k.gy or 0) + (s.lift or 0), w.Z)
 			else
 				k["w" .. side] = last[side]
 			end
@@ -289,14 +289,14 @@ function Engine.eval(R, track, t)
 	local u = 0
 	if b ~= a and b.t > a.t then u = clamp((t - a.t) / (b.t - a.t), 0, 1) end
 	local e = EASE[b.ease](u)
-	local function n(f) return lerp(a[f], b[f], e) end
+	local function n(f) return lerp(a[f] or 0, b[f] or 0, e) end
 	local P = {
 		rx = n("px"), rz = n("pz"), yaw = track.def.baseYaw + n("yaw"), pyaw = n("pyaw"),
 		crouch = n("crouch"), lean = n("lean"), twist = n("twist"), roll = n("roll"),
-		headYaw = n("headYaw"), headPitch = n("headPitch"),
+		headYaw = n("headYaw"), headPitch = n("headPitch"), gy = n("gy"),
 	}
 	local body = bodyCF(P.rx, P.rz, P.yaw)
-	local chestY = R.chestStand - P.crouch
+	local chestY = R.chestStand - P.crouch + P.gy
 	local function hand(spec, pspec)
 		return {
 			t = body:PointToWorldSpace(V3.new(spec.s, chestY + spec.y, -spec.f)),
@@ -324,7 +324,7 @@ local function setHandLocal(track, keyIdx, side, worldPoint)
 	local k = track.keys[keyIdx]
 	local b = bodyCF(k.px, k.pz, track.def.baseYaw + k.yaw)
 	local l = b:PointToObjectSpace(worldPoint)
-	local spec = { f = -l.Z, s = l.X, y = l.Y - (track.R.chestStand - k.crouch) }
+	local spec = { f = -l.Z, s = l.X, y = l.Y - (track.R.chestStand - k.crouch + (k.gy or 0)) }
 	k[side:lower() .. "h"] = spec
 	-- keep following keys that inherited the old value in sync is the data author's job
 end
@@ -379,7 +379,8 @@ function Engine.bake(R, data)
 			-- attacker's fist stops `gap` studs short of the defender's open palm (the impossible stop)
 			bakeFeet(att)
 			local P = Engine.eval(R, def_, c.t)
-			local palm = P.hands[c.dhand].t
+			local palm
+			if c.dpart == "head" then palm = Engine.solve(R, P).cf.Head.Position + V3.new(0, c.dy or 0, 0) else palm = P.hands[c.dhand].t end
 			local k = att.keys[ai]
 			local nn = flat(V3.new(k.px - palm.X, 0, k.pz - palm.Z)).Unit
 			Hc = palm + nn * (c.gap + c.fist)
@@ -2117,233 +2118,649 @@ D.colors = {
 
 return D
 ]====])
-put(RS, "ModuleScript", "BGTimeline", [====[
--- BGTimeline (ModuleScript, ReplicatedStorage): THE ONE SHARED TIMELINE for the 6-second cinematic.
--- 30 fps, frames 0-179. Fighter poses, camera cuts, debris, field, power effects, camera shake and sound cues all read from here.
--- To move a beat, change its frame number in this file only: nothing else holds timing.
---
---   T.beats      named sections (HUD / checks use them)
---   T.fighters   keyframes per rig (Blue = Kael, Purple = Ren), same pose format as BGClips but keyed by frame `f`
---   T.contacts   places where two bodies must meet (solved by BGEngine.bake)
---   T.camera     shots: {f, pos, look, fov, roll, cut = true} (cut = jump on that frame, otherwise it blends from the previous key)
---   T.fx         timed effect events; T.sound = cue list; T.eyes = Ren's eye-look keys
--- Axes: world +X is screen-right (camera sits on the +Z side). Kael faces +X, Ren faces -X. Hands/feet: f forward, s to the fighter's right, y height.
-local T = {}
-T.fps, T.frames = 30, 180
-T.duration = T.frames / T.fps          -- 6.0 s, played by elapsed time
-function T.t(frame) return frame / T.fps end
+put(RS, "ModuleScript", "BGDuel", [====[
+-- BGDuel (ModuleScript, ReplicatedStorage): THE FOUR-MINUTE TIMELINE. Teen Gojo ("Blue" rig) vs Toji ("Purple" rig), original choreography.
+-- 30 fps. Frames 0-7199 are the duel (4:00); 7200-7799 is the optional epilogue. Everything that has a time lives here:
+-- fighter keys, camera shots, effects, costume states, sound cues, slow motion. Poses are macros; footwork is generated automatically.
+-- Every state (glasses, spear, chain, tiles, lighting) is a pure function of the frame, so any chapter starts correctly when selected.
+--   Axes: +X is screen-right. Gojo faces -X (toward the gate), Toji faces +X. Heights: gy = ground height under the fighter.
+local D = {}
+D.fps, D.duelFrames, D.frames = 30, 7200, 7800
+D.duration = D.frames / D.fps
 
-T.beats = {
-	{ f = 0,   name = "open" },
-	{ f = 15,  name = "impossible stop" },
-	{ f = 38,  name = "reversal" },
-	{ f = 70,  name = "Ren takes control" },
-	{ f = 107, name = "all out" },
-	{ f = 150, name = "payoff" },
+local function sec(m, s) return math.floor((m * 60 + s) * D.fps) end
+D.chapters = {
+	{ id = 1, name = "Who moved first?",      f0 = sec(0, 0),   f1 = sec(0, 20),  q = "Who moved first?" },
+	{ id = 2, name = "Infinity",              f0 = sec(0, 20),  f1 = sec(0, 50),  q = "Can he be touched at all?" },
+	{ id = 3, name = "Blue",                  f0 = sec(0, 50),  f1 = sec(1, 20),  q = "Can he beat the pull?" },
+	{ id = 4, name = "Toji takes control",    f0 = sec(1, 20),  f1 = sec(1, 55),  q = "What is the one thing Infinity cannot stop?" },
+	{ id = 5, name = "Awakening",             f0 = sec(1, 55),  f1 = sec(2, 20),  q = "Is it over?" },
+	{ id = 6, name = "Red",                   f0 = sec(2, 20),  f1 = sec(2, 55),  q = "Can he be hit now?" },
+	{ id = 7, name = "Toji's full arsenal",   f0 = sec(2, 55),  f1 = sec(3, 35),  q = "Can speed and steel win?" },
+	{ id = 8, name = "Hollow Purple",         f0 = sec(3, 35),  f1 = sec(4, 0),   q = "What happens when both forces meet?" },
+	{ id = 9, name = "Years later - Unlimited Void (epilogue)", f0 = sec(4, 0), f1 = sec(4, 20), q = "What does the strongest see?", epilogue = true },
 }
+function D.chapterAt(frame) local c = D.chapters[1] for _, ch in ipairs(D.chapters) do if frame >= ch.f0 then c = ch end end return c end
 
+---------------------------------------------------------------------------------------------- arena landmarks
+D.arena = {
+	gate = { x = -20 }, pillar = { x = -4 },
+	stair = { x0 = 10, x1 = 15.5, topY = 3.2 },      -- 4 steps from x0 to x1
+	walkway = { x0 = 15.5, x1 = 34, y = 3.2 },
+	step = { x = 12.2, y = 1.6 },                    -- the broken step the glasses end on
+}
+local function groundAt(x)           -- ground height for placing fighters
+	local s = D.arena.stair
+	if x >= D.arena.walkway.x0 then return s.topY end
+	if x >= s.x0 then return s.topY * (x - s.x0) / (s.x1 - s.x0) end
+	return 0
+end
+D.groundAt = groundAt
+
+---------------------------------------------------------------------------------------------- poses (field tables; keys inherit)
 local function H(f, s, y) return { f = f, s = s, y = y } end
 local function F(f, s, lift) return { f = f, s = s, lift = lift or 0 } end
+local function merge(a, b) local r = {} for k, v in pairs(a) do r[k] = v end if b then for k, v in pairs(b) do r[k] = v end end return r end
 
----------------------------------------------------------------------------------------------- fighters
-local KB = {   -- Kael: confident sideways stance, relaxed shoulders, loose hands
-	dx = 0, dz = 0, yaw = 0, pyaw = -34, twist = -10, lean = 4, roll = 0, crouch = 0.2, headYaw = 0, headPitch = 0,
-	rfYaw = -50, lfYaw = -14, rfPitch = 0, lfPitch = 0, rf = F(-0.7, 0.55), lf = F(0.55, -0.4),
-	rh = H(0.25, 0.55, -0.55), lh = H(0.4, -0.5, -0.5), rp = H(0.0, 0.6, -0.9), lp = H(0.0, -0.6, -0.9),
-}
-local RB = {   -- Ren: upright, one hand loose at his side
-	dx = 0, dz = 0, yaw = 0, pyaw = -8, twist = -3, lean = 0, roll = 0, crouch = 0.05, headYaw = 0, headPitch = 0,
-	rfYaw = -12, lfYaw = -6, rfPitch = 0, lfPitch = 0, rf = F(-0.15, 0.55), lf = F(0.15, -0.45),
-	rh = H(0.05, 0.7, -0.95), lh = H(0.15, -0.65, -0.95), rp = H(0.0, 0.5, -0.9), lp = H(0.0, -0.5, -0.9),
-}
-T.bases = { Blue = KB, Purple = RB }
+-- Gojo: tall, slender, hands in pockets, weight easy
+local G = {}
+G.base = { dx = 0, dz = 0, yaw = 0, pyaw = -6, twist = 0, lean = 0, roll = 0, crouch = 0.0, headYaw = 0, headPitch = 0, gy = 0,
+	rfYaw = -8, lfYaw = -4, rfPitch = 0, lfPitch = 0, rf = F(-0.2, 0.5), lf = F(0.2, -0.45),
+	rh = H(0.1, 0.72, -1.0), lh = H(0.1, -0.72, -1.0), rp = H(0.0, 0.5, -0.9), lp = H(0.0, -0.5, -0.9) }
+G.stand = {}
+G.shift = { roll = 2, lean = 1.5, pyaw = -2 }
+G.tilt = { roll = -3, headPitch = -3, lean = -1 }                   -- amused head tilt
+G.watch = { lean = -2, pyaw = -10 }
+G.point = { pyaw = -22, twist = -10, lean = 2, rh = H(1.7, 0.2, 0.55), rp = H(0.3, 0.3, 0.2) }                    -- Blue: arm out, finger at a point
+G.pointHold = { pyaw = -22, twist = -10, lean = 4, rh = H(1.75, 0.2, 0.6) }
+G.dodgeA = { lean = -12, roll = 6, pyaw = -30, headYaw = 6, rh = H(0.1, 0.7, -0.9) }                                 -- minimal lean away
+G.dodgeB = { lean = 8, roll = -6, pyaw = 10, headYaw = -8 }
+G.hit = { lean = -22, crouch = 0.2, headPitch = -16, rh = H(0.3, 1.0, 0.0), lh = H(0.3, -1.0, 0.0), rp = H(0.0, 0.9, 0.0), lp = H(0.0, -0.9, 0.0) }
+G.down = { crouch = 1.45, lean = -16, pyaw = -14, headPitch = 12, lh = H(0.95, -0.55, -1.7), rh = H(0.4, 0.7, -1.2), rf = F(-0.3, 0.7), lf = F(0.7, -0.5) }  -- seated against the floor, left hand flat on a tile
+G.breathe1 = { lean = -14, crouch = 1.42 }
+G.breathe2 = { lean = -17, crouch = 1.48 }
+G.rise1 = { crouch = 1.2, lean = 6, headPitch = 6, lh = H(0.9, -0.55, -1.4), rh = H(0.5, 0.7, -1.0) }
+G.rise2 = { crouch = 0.4, lean = 4, headPitch = 0, lh = H(0.1, -0.72, -1.0), rh = H(0.1, 0.72, -1.0) }
+G.red = { pyaw = -30, twist = -14, lean = -4, rh = H(1.6, 0.15, 0.7), rp = H(0.3, 0.4, 0.1) }                         -- palm out
+G.purple = { pyaw = -14, twist = -6, lean = 2, rh = H(1.45, 0.35, 0.65), lh = H(1.45, -0.35, 0.65), rp = H(0.2, 0.5, 0.0), lp = H(0.2, -0.5, 0.0) }
+G.crossArms = { rh = H(1.0, 0.1, 0.5), lh = H(1.0, -0.1, 0.5) }
+G.sidestep = { roll = 8, lean = -4 }
+G.run = { lean = 14, crouch = 0.4, rh = H(0.3, 0.8, -0.8), lh = H(0.3, -0.8, -0.8) }
 
-T.fighters = {
-	Blue = {
-		baseYaw = -90, anchor = { x = -12, z = 0 },        -- anchor is re-solved so the follow-up lands on Ren's forearm
-		base = KB,
-		keys = {
-			{ f = 0 },
-			-- 0-14 Pursuit: hips drop, launch by frame 6 (feet are listed on every moving key so they travel with the body)
-			{ f = 3,  ease = "out2", crouch = 0.9, lean = 14, pyaw = -18, twist = -12, headPitch = 6, rh = H(0.1, 0.7, -0.3), lh = H(0.9, -0.4, 0.2) },
-			{ f = 6,  ease = "in2", dx = 0.5, crouch = 0.8, lean = 24, pyaw = -6, twist = 4, lf = F(1.1, -0.35, 0.15), rf = F(-1.3, 0.55, 0.35), rh = H(-0.1, 0.7, -0.3), lh = H(0.7, -0.4, 0.1) },
-			{ f = 10, ease = "linear", dx = 2.6, crouch = 0.45, lean = 28, lf = F(0.2, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8) },
-			{ f = 14, ease = "linear", dx = 5.8, lf = F(0.2, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8) },
-			-- 15-37 the burst, then the fist slows and hangs
-			{ f = 18, ease = "linear", dx = 9.0, crouch = 0.5, lean = 26, lf = F(0.3, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8), rh = H(0.6, 0.7, 0.2) },
-			{ f = 22, ease = "out2", dx = 11.0, crouch = 0.55, lean = 22, pyaw = 10, twist = 14, lf = F(1.4, -0.35, 0.25), rf = F(-1.2, 0.55, 0.5), rh = H(1.5, 0.65, 0.45) },
-			{ f = 27, ease = "out3", dx = 11.9, lf = F(1.3, -0.35, 0), rf = F(-0.75, 0.55, 0), rh = H(1.95, 0.6, 0.5) },
-			{ f = 31, ease = "out2", dx = 12.1, rh = H(2.05, 0.6, 0.5), lh = H(0.9, -0.75, 0.3) },
-			{ f = 34, ease = "linear", dx = 12.15, rh = H(2.05, 0.6, 0.5) },        -- hand baked from the hover contact
-			-- 38-69 the reversal
-			{ f = 38, ease = "in2", crouch = 1.25, lean = 34, pyaw = -6, twist = 2, rh = H(1.6, 0.6, 1.1) },
-			{ f = 42, ease = "out2", crouch = 1.35, lean = 38, rh = H(1.5, 0.6, 0.9) },
-			{ f = 44, ease = "linear", crouch = 1.3, lean = 36, rh = H(1.6, 0.6, 0.3) },       -- baked: bracer touches the field
-			{ f = 46, ease = "in3", dx = 12.35, crouch = 0.75, lean = 30, lf = F(1.5, -0.35, 0), rf = F(-1.0, 0.55, 0.2) },
-			{ f = 48, ease = "linear", dx = 12.55, crouch = 0.4, lean = 28, lf = F(1.1, -0.35, 0.5), rf = F(-1.3, 0.55, 0.7), rh = H(0.7, 0.6, 0.3) },
-			{ f = 51, ease = "out2", dx = 12.7, crouch = -0.2, lean = 24, lf = F(0.7, -0.35, 1.0), rf = F(-1.0, 0.55, 1.1), rh = H(1.0, 0.55, 0.7) },
-			{ f = 54, ease = "in2", dx = 12.78, crouch = -0.3, lean = 20, lf = F(0.8, -0.35, 1.1), rf = F(-0.6, 0.55, 1.2), rh = H(1.6, 0.55, 1.0) },
-			{ f = 56, ease = "in3", dx = 12.8, crouch = 0.0, lean = 18, pyaw = 14, twist = 18, lf = F(1.1, -0.35, 0.8), rf = F(-0.4, 0.55, 0.9), rh = H(2.0, 0.6, 0.9) },   -- CONTACT: hand baked
-			{ f = 57, ease = "linear" },                                                -- contact pose held two frames (56-57)
-			{ f = 60, ease = "out2", dx = 12.5, crouch = 1.2, lean = 22, lf = F(1.2, -0.35, 0), rf = F(-0.7, 0.55, 0), rh = H(1.2, 0.6, 0.6) },   -- hard landing
-			{ f = 66, ease = "inout", dx = 12.3, crouch = 0.8, lean = 10, pyaw = -18, twist = -6, rh = H(0.5, 0.55, 0.0), lh = H(0.5, -0.5, 0.0) },
-			-- 70-106 Ren takes control: the pull from behind, then the push
-			{ f = 70, ease = "inout", dx = 12.2, crouch = 0.6, lean = 14 },
-			{ f = 80, ease = "inout", dx = 12.2, crouch = 0.7, lean = 18, rf = F(-1.5, 0.55, 0), rh = H(0.6, 0.7, 0.2), lh = H(0.7, -0.7, 0.2) },
-			{ f = 88, ease = "inout", dx = 12.2, crouch = 0.75, lean = 20, rf = F(-1.75, 0.55, 0) },
-			{ f = 91, ease = "in2", dx = 12.2, crouch = 0.4, lean = -26, headPitch = -18, rh = H(0.2, 1.1, 0.5), lh = H(0.2, -1.1, 0.5), lf = F(0.9, -0.35, 0.1), rf = F(-1.3, 0.55, 0.2) },
-			{ f = 95, ease = "linear", dx = 9.6, crouch = 0.1, lean = -30, lf = F(1.3, -0.35, 0.25), rf = F(-0.6, 0.55, 0.3) },
-			{ f = 100, ease = "out2", dx = 5.4, crouch = 0.9, lean = -22, lf = F(1.9, -0.35, 0), rf = F(0.7, 0.55, 0), headPitch = -8, lh = H(0.9, -0.95, 0.4), rh = H(0.9, 0.95, 0.4) },
-			{ f = 104, ease = "out2", dx = 3.8, crouch = 1.0, lean = 8, headPitch = 4, lf = F(1.3, -0.35, 0), rf = F(0.0, 0.55, 0), lh = H(0.9, -0.9, 0.2), rh = H(0.9, 0.9, 0.2) },
-			-- 107-149 all out: he plants a foot and bursts across the firing lane
-			{ f = 107, ease = "inout", dx = 3.7, crouch = 1.0, lean = 18, rh = H(0.6, 0.5, 0.0), lh = H(0.7, -0.5, 0.0) },
-			{ f = 118, ease = "inout", dx = 3.8, crouch = 0.95, lean = 22, pyaw = -24, twist = -14, lf = F(1.2, -0.35, 0), rf = F(-1.2, 0.55, 0), rh = H(0.2, 0.7, -0.2) },
-			{ f = 126, ease = "inout", dx = 3.9, crouch = 1.0, lean = 28, pyaw = -28 },
-			{ f = 128, ease = "in3", dx = 4.5, dz = 0.4, crouch = 0.7, lean = 30, lf = F(1.0, -0.35, 0.2), rf = F(-1.4, 0.55, 0.5) },
-			{ f = 132, ease = "linear", dx = 10.7, dz = 2.0, crouch = 0.45, lean = 30, lf = F(0.2, -0.35, 0.8), rf = F(-1.6, 0.55, 0.9), rh = H(-0.1, 0.7, -0.2) },
-			{ f = 137, ease = "linear", dx = 17.2, dz = 2.4, lean = 28, lf = F(0.2, -0.35, 0.8), rf = F(-1.6, 0.55, 0.9) },
-			{ f = 142, ease = "out2", dx = 20.7, dz = 2.4, crouch = 0.8, lean = 24, lf = F(1.3, -0.35, 0.05), rf = F(-0.5, 0.55, 0.05) },
-			-- 150-179 payoff: one knee, head down
-			{ f = 150, ease = "out2", dx = 21.6, crouch = 1.35, lean = 26, headPitch = 22, pyaw = -10, twist = -4, lf = F(1.4, -0.35, 0), rf = F(-0.7, 0.55, 0), rh = H(0.7, 0.5, -1.2), lh = H(0.5, -0.5, -0.8) },
-			{ f = 179, ease = "inout", dx = 21.7, crouch = 1.38, lean = 24, headPitch = 24 },
-		},
-	},
-	Purple = {
-		baseYaw = 90, anchor = { x = 4.6, z = 0 },
-		base = RB,
-		keys = {
-			{ f = 0 },
-			{ f = 8,  ease = "inout", lh = H(0.9, -0.3, -0.2), headPitch = 0 },
-			{ f = 15, ease = "out2", lh = H(1.45, -0.15, 0.5), headPitch = 4 },            -- open palm rises to meet the incoming strike
-			{ f = 24, ease = "linear", headPitch = 7 },                                    -- looks at the fist
-			{ f = 34, ease = "linear", lh = H(1.45, -0.15, 0.5), headPitch = 7 },
-			{ f = 40, ease = "inout", headPitch = -5, headYaw = 0 },                       -- lifts his eyes toward Kael
-			{ f = 46, ease = "out2", lean = -6, dx = 0.1, lh = H(1.25, -0.2, 0.55) },     -- the field folds; he rocks back
-			{ f = 52, ease = "inout", lean = 0, pyaw = -16, twist = -10, lh = H(0.95, -0.4, 1.0), lp = H(0.0, -0.4, -0.9) },
-			{ f = 56, ease = "in2", pyaw = -22, twist = -18, lh = H(0.95, -0.4, 1.25), lp = H(0.0, -0.4, -0.9), rh = H(0.3, 0.7, -0.4) },   -- CONTACT: forearm raised, coat twists
-			{ f = 57, ease = "linear" },
-			{ f = 61, ease = "out2", dx = 1.1, pyaw = -34, twist = -26, lean = -8, rf = F(0.2, 0.55, 0), lf = F(0.9, -0.45, 0) },    -- boot skids half a tile
-			{ f = 67, ease = "out2", dx = 2.0, pyaw = -12, twist = -6, lean = 0, rf = F(0.4, 0.55, 0), lf = F(0.8, -0.45, 0), lh = H(1.2, -0.2, 0.7), rh = H(0.1, 0.7, -0.9) },
-			-- 70-106: pull (left hand draws in), then push (right hand thrusts out)
-			{ f = 72, ease = "out2", dx = 2.0, lh = H(1.5, -0.15, 0.6), headPitch = 0 },
-			{ f = 82, ease = "inout", lh = H(0.4, -0.3, 0.35), twist = -2 },
-			{ f = 87, ease = "inout", lh = H(0.2, -0.5, -0.4), rh = H(0.4, 0.6, 0.5), twist = -16, pyaw = -20 },
-			{ f = 91, ease = "in3", pyaw = 14, twist = 12, rh = H(1.9, 0.3, 0.75), rp = H(0.4, 0.8, 0.0), lf = F(0.35, -0.5, 0), rf = F(-0.3, 0.6, 0), rfYaw = -4, lfYaw = 0 },
-			{ f = 100, ease = "linear", rh = H(1.9, 0.3, 0.75) },
-			{ f = 107, ease = "inout", lf = F(0.15, -0.45), rf = F(-0.15, 0.55), rfYaw = -12, lfYaw = -6, pyaw = -8, twist = -3, rh = H(0.1, 0.7, -0.9), lh = H(0.15, -0.65, -0.95), rp = H(0.0, 0.5, -0.9) },
-			-- 107-149: nearly motionless; the two points are brought together in front of him
-			{ f = 112, ease = "inout", lh = H(1.0, -0.95, 0.6), rh = H(1.0, 0.95, 0.6), lp = H(0.0, -0.6, -0.5), rp = H(0.0, 0.6, -0.5) },
-			{ f = 121, ease = "inout", lh = H(1.5, -0.3, 0.7), rh = H(1.5, 0.3, 0.7) },
-			{ f = 128, ease = "in3", lean = -3, lh = H(1.75, -0.12, 0.72), rh = H(1.75, 0.12, 0.72) },
-			{ f = 149, ease = "linear" },
-			{ f = 156, ease = "inout", lean = 0, lh = H(0.5, -0.5, -0.5), rh = H(0.3, 0.6, -0.8) },
-			{ f = 164, ease = "inout", lf = F(0.15, -0.45), rf = F(-0.15, 0.55) },
-			{ f = 172, ease = "inout", headYaw = 60, twist = 14, pyaw = 4 },
-			{ f = 179, ease = "inout", headYaw = 100, twist = 30, pyaw = 14 },
-		},
-	},
+-- Toji: broad, loose, shoulders slack until the instant he moves
+local J = {}
+J.base = { dx = 0, dz = 0, yaw = 0, pyaw = -12, twist = -4, lean = 3, roll = 0, crouch = 0.3, headYaw = 0, headPitch = 3, gy = 0,
+	rfYaw = -20, lfYaw = -8, rfPitch = 0, lfPitch = 0, rf = F(-0.5, 0.6), lf = F(0.5, -0.45),
+	rh = H(0.15, 0.82, -1.0), lh = H(0.15, -0.82, -1.0), rp = H(0.0, 0.6, -0.9), lp = H(0.0, -0.6, -0.9) }
+J.loose = {}
+J.settle = { roll = -2, lean = 2, headPitch = 5 }
+J.coil = { crouch = 0.8, lean = 22, pyaw = -26, twist = -18, headPitch = 6, rh = H(0.2, 0.8, -0.2), lh = H(0.6, -0.7, 0.1) }    -- anticipation: weight drops, shoulders finally engage
+J.dash = { crouch = 0.65, lean = 30, pyaw = -6, twist = 6, headPitch = 4, rh = H(-0.1, 0.8, -0.3), lh = H(0.4, -0.7, -0.2) }
+J.land = { crouch = 1.0, lean = 16, pyaw = -12, rh = H(0.5, 0.8, -0.4), lh = H(0.6, -0.8, -0.4) }
+J.strike = { crouch = 0.6, lean = 20, pyaw = 16, twist = 18, rh = H(2.0, 0.4, 1.1), rp = H(0.3, 0.7, 0.0), lh = H(0.4, -0.8, 0.2) }
+J.strikeLoad = { crouch = 0.75, lean = 12, pyaw = -34, twist = -22, rh = H(0.3, 0.9, 0.3), lh = H(0.9, -0.5, 0.5) }
+J.watchHand = { lean = 6, headPitch = 12, rh = H(0.9, 0.3, 0.5), rp = H(0.2, 0.5, 0.0) }      -- studies his own hand
+J.crouchLow = { crouch = 1.1, lean = 18, rh = H(0.7, 0.8, -0.5), lh = H(0.7, -0.8, -0.5) }
+J.air = { crouch = -0.4, lean = 24, rh = H(0.8, 0.7, 0.3), lh = H(0.8, -0.7, 0.3) }
+J.airSpear = { crouch = -0.3, lean = 20, pyaw = 12, twist = 14, rh = H(1.5, 0.4, 0.5), lh = H(0.6, -0.8, 0.2) }
+J.spearHold = { crouch = 0.5, lean = 10, pyaw = -10, rh = H(1.0, 0.6, 0.1), rp = H(0.2, 0.7, -0.2), lh = H(0.5, -0.8, -0.3) }
+J.spearThrust = { crouch = 0.55, lean = 24, pyaw = 18, twist = 22, rh = H(2.1, 0.3, 0.7), lh = H(0.3, -0.8, 0.0) }
+J.sweep = { crouch = 0.5, lean = 14, pyaw = 30, twist = 30, rh = H(1.4, 1.1, 0.4), lh = H(0.5, -0.9, 0.1) }
+J.sweepBack = { crouch = 0.55, lean = 8, pyaw = -40, twist = -30, rh = H(0.5, 1.0, 0.4) }
+J.pull = { crouch = 0.6, lean = -8, pyaw = -30, twist = -20, rh = H(0.6, 0.7, 0.4), lh = H(0.5, -0.7, 0.4) }     -- hauling the chain
+J.flick = { rh = H(0.9, 0.5, 0.2), headPitch = 4 }
+J.stagger = { lean = -24, crouch = 0.5, headPitch = -14, rh = H(0.4, 1.0, 0.3), lh = H(0.4, -1.0, 0.3) }
+J.turnBack = { headYaw = 70, twist = 20, pyaw = 10 }                                          -- hears a footstep behind him
+J.guard = { crouch = 0.8, lean = 6, rh = H(1.0, 0.5, 0.7), lh = H(1.0, -0.5, 0.7) }
+J.p = { stand = {}, }
+
+---------------------------------------------------------------------------------------------- sequence builder + compiler
+-- seq:add(frame, poseNames, {x, z, yaw, gy, ease, <any pose field overrides>})   poseNames = one table or a list merged in order
+local Seq = {}
+Seq.__index = Seq
+local function newSeq(base, baseYaw, x0, z0) return setmetatable({ base = base, baseYaw = baseYaw, keys = {}, x0 = x0, z0 = z0 }, Seq) end
+function Seq:add(f, poses, o)
+	o = o or {}
+	local fields = {}
+	if poses then
+		if poses.rh or poses.crouch or poses.lean or poses.pyaw or poses.lh or poses.roll or poses.headYaw or poses.headPitch or poses.twist or poses.gy or next(poses) == nil then poses = { poses } end
+		for _, p in ipairs(poses) do fields = merge(fields, p) end
+	end
+	local k = { f = f, fields = fields, x = o.x, z = o.z, yaw = o.yaw, gy = o.gy, ease = o.ease, move = o.move }
+	for a, b in pairs(o) do if not ({ x = 1, z = 1, yaw = 1, gy = 1, ease = 1, move = 1 })[a] then k.fields[a] = b end end
+	table.insert(self.keys, k)
+	return self
+end
+
+local function lastPos(seq, i)
+	for j = i - 1, 1, -1 do
+		local k = seq.keys[j]
+		if k.rx then return k end
+	end
+end
+
+-- numeric-aware linear blend of two pose-field tables (hands/feet are small tables of numbers)
+local function lerpFields(a, b, u)
+	local r = {}
+	for k, v in pairs(b) do
+		local av = a[k]
+		if type(v) == "number" then r[k] = (type(av) == "number") and (av + (v - av) * u) or v
+		elseif type(v) == "table" then
+			local t = {}
+			for kk, vv in pairs(v) do
+				local avv = type(av) == "table" and av[kk] or nil
+				t[kk] = (type(vv) == "number" and type(avv) == "number") and (avv + (vv - avv) * u) or vv
+			end
+			r[k] = t
+		else r[k] = v end
+	end
+	return r
+end
+
+-- Resolve absolute positions, add intermediate footsteps on every long move, generate feet (walk steps, dash trails, plants), emit Engine data.
+function Seq:compile()
+	table.sort(self.keys, function(a, b) return a.f < b.f end)
+	local px, pz, pyaw, pgy, pf = self.x0, self.z0, 0, 0, 0
+	local cur = merge(self.base, {})                  -- cumulative pose fields (what the Engine will have inherited so far)
+	local flip, prevMoving = false, false
+	local out = {}
+	local function emit(f, rx, rz, ryaw, rgy, fields, ease, feet)
+		local ek = { t = f / D.fps, ease = ease, dx = rx - self.x0, dz = rz - self.z0, yaw = ryaw, gy = rgy }
+		for a, b in pairs(fields) do ek[a] = b end
+		if feet then ek.lf, ek.rf = feet[1], feet[2] end
+		out[#out + 1] = ek
+	end
+	for i, k in ipairs(self.keys) do
+		local rx, rz = k.x or px, k.z or pz
+		local ryaw = k.yaw or pyaw
+		local rgy = k.gy or groundAt(rx)
+		local nxt = merge(cur, k.fields)
+		if i == 1 then
+			emit(k.f, rx, rz, ryaw, rgy, nxt, k.ease, { nxt.lf or self.base.lf, nxt.rf or self.base.rf })
+		else
+			local dxw, dzw = rx - px, rz - pz
+			local dist = math.sqrt(dxw * dxw + dzw * dzw)
+			local df = k.f - pf
+			local dt = math.max(df / D.fps, 1e-3)
+			local speed = dist / dt
+			local explicitFeet = k.fields.lf ~= nil or k.fields.rf ~= nil
+			local y = math.rad(self.baseYaw + ryaw)
+			local fx, fz = -math.sin(y), -math.cos(y)
+			local rx_, rz_ = math.cos(y), -math.sin(y)
+			local mf, ms = 0, 0
+			if dist > 1e-3 then mf, ms = (dxw * fx + dzw * fz) / dist, (dxw * rx_ + dzw * rz_) / dist end
+			if explicitFeet or dist < 0.35 then
+				local feet
+				if not explicitFeet and prevMoving then feet = { F(0.35, -0.45, 0), F(-0.35, 0.55, 0) }; prevMoving = false end
+				emit(k.f, rx, rz, ryaw, rgy, k.fields, k.ease, feet)
+			elseif speed >= 7 then
+				emit(k.f, rx, rz, ryaw, rgy, k.fields, k.ease, { F(0.4 + 0.8 * mf, -0.4 + 0.8 * ms, 0.6), F(-0.5 - 0.8 * mf, 0.5 - 0.8 * ms, 0.7) })
+				prevMoving = true
+			else
+				-- walk: one footstep per ~0.9 studs, sub-keys along the path
+				local n = math.max(1, math.ceil(dist / 0.9))
+				for j = 1, n do
+					local u = j / n
+					local last = (j == n)
+					local sx, sz, sy = px + dxw * u, pz + dzw * u, pyaw + (ryaw - pyaw) * u
+					local sg = last and rgy or (k.gy and (pgy + (rgy - pgy) * u) or groundAt(sx))
+					flip = not flip
+					local s = flip and 1 or -1
+					local feet = { F(0.45 + s * mf * 0.75, -0.42 + s * ms * 0.75, flip and 0 or 0.22), F(-0.45 - s * mf * 0.75, 0.55 - s * ms * 0.75, flip and 0.22 or 0) }
+					local f = pf + df * u
+					local fields = last and k.fields or lerpFields(cur, nxt, u)
+					if last and speed < 7 then feet = nil end
+					emit(f, sx, sz, sy, sg, fields, last and k.ease or "linear", feet)
+				end
+				-- plant on arrival
+				out[#out].lf, out[#out].rf = F(0.35, -0.45, 0), F(-0.35, 0.55, 0)
+				prevMoving = false
+			end
+		end
+		cur = nxt
+		px, pz, pyaw, pgy, pf = rx, rz, ryaw, rgy, k.f
+	end
+	return { baseYaw = self.baseYaw, anchor = { x = self.x0, z = self.z0 }, base = self.base, keys = out }
+end
+
+local Gj = newSeq(G.base, 90, 6.0, 0.0)        -- Gojo faces -X
+local Tj = newSeq(J.base, -90, -20.0, 0.0)     -- Toji faces +X
+D.seq = { Blue = Gj, Purple = Tj }
+
+---------------------------------------------------------------------------------------------- CHAPTER 1: Who moved first? (0-600)
+Gj:add(0,   G.stand, { x = 6.0, z = 0.0 })
+Gj:add(40,  G.shift)
+Gj:add(50,  { G.shift, { headYaw = 0 } })
+Gj:add(78,  { G.watch, { headYaw = -26 } }, { ease = "out2" })                -- head follows AFTER the eyes found Toji
+Gj:add(150, { G.watch, { headYaw = -26 } })
+Gj:add(160, { G.watch, { headYaw = -30, headPitch = 2 } })
+Gj:add(236, G.tilt)
+Gj:add(300, { G.tilt, { headYaw = -18 } })
+Gj:add(420, G.stand, { x = 6.2 })
+Gj:add(560, { G.shift, { headYaw = -12 } })
+Gj:add(599, { G.stand })
+Tj:add(0,   J.loose, { x = -20.0, z = 0.0 })
+Tj:add(60,  J.loose, { x = -20.0 })
+Tj:add(120, J.settle, { x = -19.8 })
+Tj:add(150, J.coil, { x = -19.8, ease = "in2" })                              -- 5 frames anticipation: the shoulders stay loose until here
+Tj:add(155, J.dash, { x = -19.2, ease = "in3" })
+Tj:add(159, J.land, { x = -4.2, z = 0.4, ease = "linear" })                   -- 4 frames across the courtyard, gate to pillar
+Tj:add(166, J.land, { x = -4.0, ease = "out3" })
+Tj:add(190, J.settle, { x = -3.6, ease = "inout" })
+Tj:add(236, J.loose, { x = -3.4 })
+Tj:add(300, { J.loose, { headPitch = 6 } })
+Tj:add(330, J.loose, { x = -3.2 })
+Tj:add(420, J.loose, { x = -1.4, z = 0.2 })                                   -- walks toward him
+Tj:add(500, J.settle, { x = 0.6, z = 0.3 })
+Tj:add(599, J.loose, { x = 1.2, z = 0.3 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 2: Infinity (600-1500)
+-- attempt 1: a flicked pebble slows beside Gojo's cheek (pebble path in D.fx)
+Tj:add(600, J.flick, { x = 1.2 })
+Tj:add(612, { J.flick, { rh = H(1.5, 0.5, 0.9) } }, { ease = "in2" })
+Tj:add(622, J.loose, { x = 1.2 })
+Gj:add(612, G.stand)
+Gj:add(655, { G.watch, { headYaw = -8, headPitch = 4 } })
+Gj:add(700, G.tilt)
+-- attempt 2: an ordinary strike decelerates a visible gap short of Gojo's face (slow motion 905-960)
+Tj:add(760, J.settle, { x = 1.4 })
+Tj:add(840, J.loose, { x = 2.6, z = 0.3 })
+Tj:add(895, J.strikeLoad, { x = 3.2, ease = "in2" })
+Tj:add(900, J.strikeLoad, { x = 3.2 })
+Tj:add(906, J.strike, { x = 3.5, ease = "in3" })                              -- contact baked: hover short of the face
+Tj:add(960, J.strike, { x = 3.5, ease = "linear" })
+Tj:add(985, J.settle, { x = 3.0, ease = "out2" })
+Gj:add(840, G.stand)
+Gj:add(900, { G.watch, { headPitch = 2 } })
+Gj:add(906, { G.dodgeA, { rh = H(0.1, 0.72, -1.0) } }, { ease = "out2" })     -- he barely moves: a tiny lean while Infinity does the work
+Gj:add(960, { G.dodgeA })
+Gj:add(1000, G.tilt)
+-- attempt 3: Toji changes direction midway and watches when Gojo turns
+Tj:add(1040, J.coil, { x = 3.0, ease = "in2" })
+Tj:add(1046, J.dash, { x = 3.0, ease = "in2" })
+Tj:add(1050, J.dash, { x = 5.2, z = 1.8, ease = "linear" })                   -- feints to the near side
+Tj:add(1055, J.strikeLoad, { x = 5.6, z = 1.8 })
+Tj:add(1058, J.dash, { x = 7.8, z = -2.4, yaw = 20, ease = "linear" })        -- cuts back across behind Gojo's head
+Tj:add(1066, J.strike, { x = 8.4, z = -2.4, yaw = 20 })
+Tj:add(1100, J.watchHand, { x = 7.6, z = -2.0, yaw = 20 })
+Tj:add(1180, J.watchHand, { x = 6.4, z = -0.8, yaw = 10 })
+Tj:add(1260, J.settle, { x = 5.0, z = -0.4, yaw = 0 })
+Tj:add(1380, J.settle, { x = 2.4, z = 0.2 })
+Tj:add(1499, J.loose, { x = 1.0, z = 0.2 })
+Gj:add(1040, { G.watch, { headYaw = -22 } })
+Gj:add(1058, { G.watch, { headYaw = 10 } }, { ease = "linear" })              -- Gojo turns to follow; Toji's head tracks that turn
+Gj:add(1090, { G.tilt, { headYaw = 18 } })
+Gj:add(1200, { G.stand, { headYaw = 8 } })
+Gj:add(1400, G.stand)
+Gj:add(1499, G.shift)
+
+---------------------------------------------------------------------------------------------- CHAPTER 3: Blue (1500-2400)
+Gj:add(1500, G.stand)
+Gj:add(1530, G.pointHold, { ease = "out2" })
+Gj:add(1620, G.pointHold)
+Gj:add(1690, { G.pointHold, { lean = -6 } })
+Gj:add(1780, G.stand, { ease = "inout" })
+Gj:add(1900, { G.watch, { headYaw = 40 } }, { yaw = 0 })
+Gj:add(2000, { G.watch, { headYaw = 55 } })
+Gj:add(2100, G.shift, { x = 6.2 })
+Gj:add(2160, { G.watch, { headYaw = 60 } })
+Gj:add(2250, G.stand, { x = 9.2 })                                            -- follows up toward the stair, then the walkway
+Gj:add(2340, G.stand, { x = 16.6 })
+Gj:add(2399, G.stand, { x = 18.0 })
+-- Toji: trousers pull sideways (cloth wind), footing gives, he rides the slab up and over, lands on the stair, then the walkway
+Tj:add(1530, J.loose, { x = 1.0, z = 0.2 })
+Tj:add(1590, { J.crouchLow, { roll = 8 } }, { x = 0.6, z = 0.4 })              -- being pulled: footing gives
+Tj:add(1640, J.crouchLow, { x = -1.6, z = 0.4, ease = "linear" })              -- dragged toward the point; slab arrives
+Tj:add(1690, { J.coil, { crouch = 0.9 } }, { x = -2.2 })                       -- he steps onto the slab
+Tj:add(1700, J.dash, { x = -1.0, gy = 0.4, ease = "in2" })
+Tj:add(1708, J.air, { x = 3.0, gy = 2.3, ease = "linear" })                    -- rides the tilting slab upward
+Tj:add(1722, J.air, { x = 8.0, gy = 4.4, ease = "linear" })                    -- over Gojo
+Tj:add(1736, J.airSpear, { x = 11.2, gy = 4.0, ease = "in2" })
+Tj:add(1744, J.land, { x = 11.8, gy = 1.9, ease = "out2" })                    -- lands on the stair
+Tj:add(1770, J.settle, { x = 12.0 })
+Tj:add(1900, J.loose, { x = 13.5 })
+Tj:add(2100, J.loose, { x = 15.0 })
+Tj:add(2200, J.settle, { x = 19.0 })
+Tj:add(2399, J.loose, { x = 24.0 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 4: Toji takes control (2400-3450)
+Tj:add(2400, J.loose, { x = 24.0, z = 0.0 })
+Tj:add(2480, J.spearHold, { x = 24.0 })                                       -- the curse uncoils and produces the Inverted Spear of Heaven
+Tj:add(2560, J.spearHold, { x = 24.0 })
+Tj:add(2640, J.spearHold, { x = 24.2, z = 0.3 })
+Tj:add(2700, J.coil, { x = 24.2, ease = "in2" })
+Tj:add(2705, J.dash, { x = 24.4, ease = "in2" })
+Tj:add(2711, J.air, { x = 18.0, z = 1.8, ease = "linear" })                    -- crosses behind the swarm while Gojo watches the empty stair
+Tj:add(2716, J.spearThrust, { x = 17.0, z = 1.0, ease = "linear" })           -- contact baked on Gojo's torso
+Tj:add(2722, J.spearThrust, { x = 17.0, z = 1.0 })
+Tj:add(2760, J.spearHold, { x = 16.4, z = 1.0, ease = "out2" })
+Tj:add(2900, J.settle, { x = 17.6, z = 0.8 })
+Tj:add(3000, J.loose, { x = 20.0, z = 0.4 })
+Tj:add(3100, J.loose, { x = 17.0, z = -0.8 })                                  -- leaves: down the stair, out of frame
+Tj:add(3200, J.dash, { x = 13.0, z = -0.6 })
+Tj:add(3260, J.dash, { x = 5.0 })
+Tj:add(3340, J.dash, { x = -8.0 })
+Tj:add(3449, J.loose, { x = -12.0 })
+Gj:add(2400, G.stand, { x = 18.0 })
+Gj:add(2500, { G.watch, { headYaw = 10 } })
+Gj:add(2600, { G.stand, { headYaw = -10 } })
+Gj:add(2680, { G.watch, { headYaw = -34 } })                                  -- eyes tracking the swarm
+Gj:add(2710, { G.watch, { headYaw = -50, headPitch = 6 } })
+Gj:add(2716, G.hit, { x = 18.0, ease = "in3" })                                -- spear contact (Infinity folds inward)
+Gj:add(2740, { G.hit, { lean = -26 } }, { x = 18.6, ease = "out2" })
+Gj:add(2800, G.down, { x = 19.4, ease = "out2" })
+Gj:add(3449, G.down, { x = 19.4 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 5: Awakening (3450-4200)
+Gj:add(3450, G.down, { x = 19.4 })
+Gj:add(3560, G.breathe1)
+Gj:add(3640, G.breathe2)
+Gj:add(3720, G.breathe1)
+Gj:add(3780, { G.breathe2, { lh = H(0.95, -0.55, -1.75) } })                  -- fingers regain tension: the hand presses the tile
+Gj:add(3850, G.rise1, { ease = "inout" })
+Gj:add(3930, G.rise2, { ease = "inout" })
+Gj:add(3990, G.stand, { x = 19.2 })
+Gj:add(4060, G.stand, { x = 17.2 })                                            -- walks to the top of the stair
+Gj:add(4130, G.stand, { x = 14.0, z = 0.6 })
+Gj:add(4199, G.stand, { x = 11.0, z = 0.6 })
+Tj:add(3450, J.loose, { x = -12.0 })
+Tj:add(3900, J.settle, { x = -9.0, yaw = 180 })
+Tj:add(4040, J.loose, { x = -9.0, yaw = 180 })                                 -- hears a footstep behind him
+Tj:add(4060, { J.loose, { headYaw = -40 } }, { yaw = 180 })
+Tj:add(4090, { J.turnBack }, { x = -9.0, yaw = 180 })
+Tj:add(4150, J.settle, { x = -9.0, yaw = 0, ease = "out2" })
+Tj:add(4199, J.loose, { x = -9.0, yaw = 0 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 6: Red (4200-5250)
+Gj:add(4200, G.stand, { x = 11.0, z = 0.6 })
+Gj:add(4260, G.stand, { x = 6.2, z = 0.0, ease = "inout" })
+Gj:add(4330, { G.watch, { headYaw = -34 } })                                    -- already looking at the landing point
+Gj:add(4380, G.red, { ease = "out2" })
+Gj:add(4460, G.red)
+Gj:add(4530, { G.stand, { headYaw = -20 } })
+Gj:add(4620, G.dodgeA, { x = 6.0 })
+Gj:add(4670, G.sidestep, { x = 5.6, z = -0.4 })
+Gj:add(4740, G.dodgeB, { x = 6.0, z = 0.2 })
+Gj:add(4800, { G.sidestep, { lean = -2 } }, { x = 5.8, z = -0.3 })
+Gj:add(4900, G.dodgeA, { x = 6.2, z = 0.0 })
+Gj:add(5000, { G.watch }, { x = 6.0 })
+Gj:add(5120, { G.tilt }, { x = 6.0 })
+Gj:add(5249, G.stand, { x = 6.0 })
+Tj:add(4200, J.loose, { x = -9.0 })
+Tj:add(4290, J.settle, { x = -17.0, yaw = 0 })
+Tj:add(4330, J.coil, { x = -19.8, ease = "in2" })
+Tj:add(4336, J.dash, { x = -19.2, ease = "in3" })
+Tj:add(4340, J.dash, { x = -9.0, z = 0.2, ease = "linear" })
+Tj:add(4342, { J.strike, { lean = 10 } }, { x = -5.4, z = 0.3, ease = "in2" })      -- the Red core repels him: reversed travel
+Tj:add(4350, J.stagger, { x = -9.2, ease = "out2" })
+Tj:add(4372, J.stagger, { x = -15.0, ease = "out2" })
+Tj:add(4390, J.land, { x = -15.8, ease = "out2" })
+Tj:add(4460, J.settle, { x = -15.0 })
+Tj:add(4500, J.coil, { x = -14.8, ease = "in2" })
+Tj:add(4506, J.dash, { x = -10.0, ease = "in2" })
+Tj:add(4510, J.air, { x = -4.0, gy = 1.4, ease = "linear" })                     -- fast exchange: Toji changes height
+Tj:add(4514, J.strike, { x = 3.0, gy = 0.0, ease = "in2" })
+Tj:add(4522, J.land, { x = 3.4 })
+Tj:add(4560, J.dash, { x = 8.5, z = -1.0 })
+Tj:add(4565, J.strike, { x = 6.8, z = -1.2, ease = "in2" })
+Tj:add(4590, J.crouchLow, { x = 6.0, z = 1.4 })
+Tj:add(4640, J.dash, { x = 2.0, z = 1.6 })
+Tj:add(4646, { J.strike, { rh = H(1.6, 0.4, 0.9) } }, { x = 4.2, z = 1.0, ease = "in2" })
+Tj:add(4700, J.land, { x = 3.2, z = 0.8 })
+Tj:add(4780, J.air, { x = 6.8, z = -0.2, gy = 1.8, ease = "in2" })
+Tj:add(4786, J.airSpear, { x = 7.4, z = 0.2, gy = 1.9 })
+Tj:add(4800, J.land, { x = 4.6, z = 0.4, gy = 0.0 })
+Tj:add(4900, J.crouchLow, { x = 4.0, z = -0.2 })
+Tj:add(4960, J.dash, { x = 8.4, z = 0.3 })
+Tj:add(4966, J.strike, { x = 7.6, z = 0.0, ease = "in2" })
+Tj:add(5020, J.settle, { x = 3.4, z = 0.2 })
+Tj:add(5249, J.loose, { x = 3.0, z = 0.2 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 7: Toji's full arsenal (5250-6450)
+Tj:add(5250, J.loose, { x = 3.0, z = 0.2 })
+Tj:add(5340, J.spearHold, { x = 2.6 })                                          -- chain revealed: spear + chain, far end hidden in the curse
+Tj:add(5460, J.coil, { x = 2.4, ease = "in2" })
+Tj:add(5466, J.sweepBack, { x = 2.4 })
+Tj:add(5474, J.sweep, { x = 3.4, ease = "in3" })                                -- exchange 1: a broad sweep that changes the available space
+Tj:add(5486, J.sweep, { x = 3.8, ease = "out2" })
+Tj:add(5530, J.settle, { x = 3.6 })
+Tj:add(5680, J.dash, { x = 8.0 })
+Tj:add(5686, J.strike, { x = 6.6, ease = "in2" })
+Tj:add(5700, J.land, { x = 5.0 })
+Tj:add(5780, J.pull, { x = 5.0 })                                               -- exchange 2: sudden return interrupts the approach
+Tj:add(5800, J.pull, { x = 4.0, ease = "in2" })
+Tj:add(5812, J.spearHold, { x = 4.0 })
+Tj:add(5950, J.coil, { x = 3.8, ease = "in2" })
+Tj:add(5956, J.air, { x = 7.0, gy = 2.0, ease = "in2" })                         -- exchange 3: airborne crossing, the chain divides the frame
+Tj:add(5966, J.airSpear, { x = 12.0, gy = 2.6, z = -0.3, ease = "linear" })
+Tj:add(5976, J.air, { x = 17.0, gy = 3.4, ease = "linear" })
+Tj:add(5984, J.land, { x = 18.4, ease = "out2" })
+Tj:add(6050, J.settle, { x = 17.0 })
+Tj:add(6120, J.dash, { x = 10.0 })
+Tj:add(6126, J.strike, { x = 8.0, z = 0.0, ease = "in2" })                       -- he nearly reclaims the advantage
+Tj:add(6180, J.crouchLow, { x = 7.0, z = 0.4 })
+Tj:add(6300, J.settle, { x = 6.0 })
+Tj:add(6449, J.loose, { x = 2.0 })
+Gj:add(5250, G.stand, { x = 6.0 })
+Gj:add(5340, { G.watch, { headYaw = -28 } })
+Gj:add(5474, G.dodgeA, { x = 6.0 })
+Gj:add(5486, G.sidestep, { x = 7.8, z = -0.5, ease = "out2" })
+Gj:add(5560, { G.watch, { headYaw = -20 } }, { x = 8.0 })
+Gj:add(5640, G.stand, { x = 6.4, z = 0.0 })                                       -- steps in: the return interrupts him
+Gj:add(5680, G.run, { x = 3.8 })
+Gj:add(5800, G.hit, { x = 4.8, ease = "out2" })
+Gj:add(5840, G.sidestep, { x = 7.2 })
+Gj:add(5950, { G.watch, { headYaw = -16 } }, { x = 7.0 })
+Gj:add(5976, G.dodgeA, { x = 9.4, ease = "out2" })
+Gj:add(6060, G.sidestep, { x = 11.0 })
+Gj:add(6130, G.dodgeB, { x = 11.6, z = 0.4 })
+Gj:add(6220, G.sidestep, { x = 12.4 })
+Gj:add(6449, { G.watch, { headYaw = -20 } }, { x = 12.4 })
+
+---------------------------------------------------------------------------------------------- CHAPTER 8: Hollow Purple (6450-7200)
+Gj:add(6450, { G.watch }, { x = 12.4, z = 0.0 })
+Gj:add(6530, G.pointHold, { x = 12.4 })                                           -- Blue
+Gj:add(6600, G.red, { x = 12.4 })                                                 -- Red
+Gj:add(6700, G.purple, { x = 12.4, ease = "inout" })                              -- brings the two together
+Gj:add(6870, G.purple, { x = 12.4 })
+Gj:add(6900, { G.purple, { lean = -4 } }, { ease = "in3" })                       -- release
+Gj:add(6960, { G.purple, { lean = -8 } })
+Gj:add(7050, G.stand, { x = 12.4 })
+Gj:add(7160, { G.tilt, { headPitch = 6 } })
+Gj:add(7199, { G.tilt, { headPitch = 6 } })
+Tj:add(6450, J.loose, { x = 2.0 })
+Tj:add(6600, J.settle, { x = 2.4 })
+Tj:add(6700, { J.guard }, { x = 2.4 })
+Tj:add(6790, { J.guard, { headPitch = 0 } }, { x = 2.4 })                         -- recognises an unfamiliar technique
+Tj:add(6860, J.dash, { x = 3.4 })
+Tj:add(6900, { J.guard, { lean = 16 } }, { x = 3.4 })
+Tj:add(6960, J.stagger, { x = 2.0, ease = "out2" })
+Tj:add(7100, J.settle, { x = 1.4 })
+Tj:add(7199, J.loose, { x = 1.4 })
+
+---------------------------------------------------------------------------------------------- EPILOGUE (7200-7799): adult Gojo, blindfold, Unlimited Void
+Gj:add(7200, G.stand, { x = 6.0, z = 0.0, gy = 0, yaw = 0 })
+Gj:add(7400, { G.stand, { headPitch = -4 } })
+Gj:add(7500, { G.watch })
+Gj:add(7799, { G.stand })
+Tj:add(7200, J.loose, { x = -60.0, z = -60.0 })                                    -- Toji is not in the epilogue (parked far away)
+Tj:add(7799, J.loose, { x = -60.0, z = -60.0 })
+
+---------------------------------------------------------------------------------------------- contacts (solved by BGEngine.bake)
+D.contacts = {
+	{ id = "fist-stop", kind = "hover", f = 906, attacker = "Purple", hand = "R", defender = "Blue", dpart = "head", dy = 0.0, gap = 0.5, fist = 0.3 },
+	{ id = "spear-fold", kind = "chest", f = 2716, attacker = "Purple", hand = "R", defender = "Blue", surface = 0.5, up = 0.1 },
 }
 
--- Ren's eye-look keys (x, y in head units); eyes move before the head does
-T.eyes = {
-	{ f = 0, x = 0, y = 0 }, { f = 22, x = 0, y = -0.05 }, { f = 36, x = 0, y = 0.05 }, { f = 107, x = 0, y = 0 },
-	{ f = 154, x = 0.07, y = 0 }, { f = 160, x = 0.07, y = 0 }, { f = 176, x = 0, y = 0 },
-}
-
----------------------------------------------------------------------------------------------- contacts
-T.contacts = {
-	-- Kael's follow-up lands on Ren's raised left forearm
-	{ id = "followup", kind = "guard", f = 56, attacker = "Blue", hand = "R", defender = "Purple", arm = "L", guardRadius = 0.52, fist = 0.3, reach = 0.55 },
-	-- the impossible stop: fist ends `gap` studs short of Ren's palm
-	{ id = "stop", kind = "hover", f = 34, attacker = "Blue", hand = "R", defender = "Purple", dhand = "L", gap = 0.55, fist = 0.3 },
-	-- the bracer is pressed into the field plane
-	{ id = "bracer", kind = "point", f = 44, attacker = "Blue", hand = "R", ref = 2, dx = -0.1, dy = -0.75, dz = 0 },
+---------------------------------------------------------------------------------------------- eyes (Gojo's eyes find Toji before his head turns)
+D.eyes = {
+	Blue = { { f = 0, x = 0, y = 0 }, { f = 50, x = 0, y = 0 }, { f = 58, x = -0.075, y = 0 }, { f = 300, x = -0.075, y = 0 }, { f = 1058, x = 0.07, y = 0 },
+		{ f = 1400, x = -0.05, y = 0 }, { f = 2680, x = -0.075, y = 0.02 }, { f = 3800, x = 0, y = 0 }, { f = 3880, x = 0.0, y = 0 },
+		{ f = 4330, x = -0.075, y = 0 }, { f = 7000, x = 0, y = 0 }, { f = 7199, x = 0, y = -0.03 } },
+	Purple = { { f = 0, x = 0, y = 0 }, { f = 4040, x = 0, y = 0 }, { f = 4052, x = 0.06, y = 0 }, { f = 4150, x = 0, y = 0 } },
 }
 
 ---------------------------------------------------------------------------------------------- camera
--- Left-to-right is preserved: every shot is on the +Z side looking toward -Z. Cuts jump on their frame; other keys blend.
-T.camera = {
-	{ f = 0,   name = "A wide 3/4",   pos = { -4.5, 3.4, 13.5 }, look = { -3.5, 3.0, 0 },  fov = 44 },
-	{ f = 14,  name = "A hold",       pos = { -4.5, 3.4, 13.5 }, look = { -3.5, 3.0, 0 },  fov = 44 },
-	{ f = 15,  name = "B stop",       pos = { 2.2, 3.4, 8.2 },  look = { 2.4, 3.3, 0 },   fov = 28, cut = true },
-	{ f = 37,  name = "B push-in",    pos = { 2.4, 3.4, 7.0 },  look = { 2.5, 3.3, 0 },   fov = 28 },
-	{ f = 38,  name = "B2",           pos = { 2.3, 3.0, 6.8 },  look = { 2.5, 3.0, 0 },   fov = 28, cut = true },
-	{ f = 45,  name = "C tight",      pos = { 3.0, 2.9, 5.0 },  look = { 3.1, 2.9, 0 },   fov = 26, cut = true },
-	{ f = 57,  name = "C contact",    pos = { 3.4, 3.0, 5.0 },  look = { 3.5, 3.1, 0 },   fov = 26 },
-	{ f = 58,  name = "C settle",     pos = { 3.8, 3.0, 6.8 },  look = { 4.0, 3.0, 0 },   fov = 30 },
-	{ f = 70,  name = "D wide low",   pos = { -0.5, 2.2, 14.0 }, look = { -0.5, 2.4, 0 },  fov = 50, cut = true },
-	{ f = 106, name = "D hold",       pos = { -0.5, 2.2, 14.0 }, look = { -0.5, 2.4, 0 },  fov = 50 },
-	{ f = 107, name = "E wide side",  pos = { 0.8, 3.2, 16.0 }, look = { 0.8, 2.9, 0 },   fov = 48, cut = true },
-	{ f = 149, name = "E drift",      pos = { 1.2, 3.2, 15.4 }, look = { 1.2, 2.9, 0 },   fov = 47 },
-	{ f = 150, name = "F final",      pos = { 5.8, 2.8, 13.0 }, look = { 6.0, 2.4, 0 },   fov = 44, cut = true },
-	{ f = 179, name = "F hold",       pos = { 6.0, 2.8, 12.6 }, look = { 6.2, 2.4, 0 },   fov = 44 },
+-- pos/look = {x, y, z} or { rel = "Blue"|"Purple", o = {x, y, z} } (relative to that fighter's head). cut = true jumps on that frame; otherwise it blends from the previous key.
+local function cam(f, pos, look, fov, extra)
+	local c = { f = f, pos = pos, look = look, fov = fov }
+	if extra then for k, v in pairs(extra) do c[k] = v end end
+	return c
+end
+local function rel(who, x, y, z) return { rel = who, o = { x, y, z } } end
+local WIDE_A = { { -4.0, 3.6, 17.5 }, { -4.0, 2.6, 0 }, 44 }                -- the opening wide: gate, pillar and Gojo, repeated in chapter 6
+D.camera = {
+	-- 1: glasses close-up, wide, Toji's landing, Gojo's eyes, Toji's scar
+	cam(0,    rel("Blue", -0.1, 0.05, -1.6), rel("Blue", 0, 0.05, 0), 18, { cut = true, name = "1 glasses CU" }),
+	cam(59,   rel("Blue", -0.1, 0.05, -1.6), rel("Blue", 0, 0.05, 0), 18),
+	cam(60,   WIDE_A[1], WIDE_A[2], WIDE_A[3], { cut = true, name = "1 wide: gate, pillar, stair" }),
+	cam(235,  WIDE_A[1], WIDE_A[2], WIDE_A[3]),
+	cam(236,  rel("Blue", -0.4, 0.15, -2.4), rel("Blue", 0, 0.05, 0), 22, { cut = true, name = "1 Gojo CU: eyes first" }),
+	cam(268,  rel("Blue", -0.4, 0.15, -2.4), rel("Blue", 0, 0.05, 0), 22),
+	cam(269,  rel("Purple", 0.9, 0.1, 2.1), rel("Purple", 0, 0.0, 0), 20, { cut = true, name = "1 Toji CU: scar" }),
+	cam(300,  rel("Purple", 0.9, 0.1, 2.1), rel("Purple", 0, 0.0, 0), 20),
+	cam(301,  { -1.0, 3.2, 12.0 }, { 1.2, 2.8, 0 }, 40, { cut = true, name = "1 two-shot" }),
+	cam(599,  { -0.6, 3.2, 11.4 }, { 1.6, 2.8, 0 }, 40),
+	-- 2: pebble, fist stop (slow motion), feint
+	cam(600,  { 4.0, 3.6, 7.0 }, { 5.6, 3.6, 0 }, 28, { cut = true, name = "2 pebble by the cheek" }),
+	cam(700,  { 4.4, 3.6, 6.4 }, { 5.8, 3.6, 0 }, 26),
+	cam(701,  { 2.0, 3.2, 11.0 }, { 4.2, 2.8, 0 }, 40, { cut = true, name = "2 two-shot" }),
+	cam(900,  { 2.0, 3.2, 11.0 }, { 4.2, 2.8, 0 }, 40),
+	cam(901,  { 4.2, 3.6, 5.6 }, { 5.0, 3.7, 0 }, 24, { cut = true, name = "2 the gap (slow)" }),
+	cam(985,  { 4.4, 3.6, 5.2 }, { 5.0, 3.7, 0 }, 24),
+	cam(986,  { 3.0, 3.2, 12.0 }, { 5.0, 2.8, 0 }, 40, { cut = true, name = "2 feint wide" }),
+	cam(1260, { 3.4, 3.2, 12.0 }, { 5.0, 2.8, 0 }, 40),
+	cam(1261, rel("Purple", 0.6, 0.15, 2.0), rel("Purple", 0, 0, 0), 22, { cut = true, name = "2 Toji studies" }),
+	cam(1360, rel("Purple", 0.6, 0.15, 2.0), rel("Purple", 0, 0, 0), 22),
+	cam(1361, { 3.0, 3.2, 12.0 }, { 3.8, 2.8, 0 }, 42, { cut = true }),
+	-- 3: Blue: one continuous full-body shot of the maneuver, then the stair
+	cam(1500, { 0.5, 3.4, 15.5 }, { 2.0, 2.6, 0 }, 46, { cut = true, name = "3 Gojo picks the point" }),
+	cam(1680, { 0.5, 3.4, 15.5 }, { 2.0, 2.6, 0 }, 46),
+	cam(1681, { 3.0, 4.2, 20.0 }, { 5.0, 3.0, 0 }, 52, { cut = true, name = "3 full-body maneuver (continuous)" }),
+	cam(1790, { 4.0, 4.2, 20.0 }, { 7.0, 3.0, 0 }, 52),
+	cam(1791, { 11.0, 4.0, 17.0 }, { 13.0, 3.0, 0 }, 46, { cut = true, name = "3 stair" }),
+	cam(2399, { 16.0, 5.5, 18.0 }, { 20.0, 4.0, 0 }, 46),
+	-- 4: walkway, swarm, Gojo's POV, wide reveal, the fold, Gojo down
+	cam(2400, { 20.0, 5.4, 15.0 }, { 21.5, 4.4, 0 }, 44, { cut = true, name = "4 walkway: the curse uncoils" }),
+	cam(2599, { 21.0, 5.4, 14.0 }, { 22.5, 4.4, 0 }, 42),
+	cam(2600, { 17.0, 5.6, 13.0 }, { 18.0, 4.4, 0 }, 40, { cut = true, name = "4 the swarm" }),
+	cam(2670, { 17.0, 5.6, 13.0 }, { 18.0, 4.4, 0 }, 40),
+	cam(2671, rel("Blue", 0.0, 0.0, 0.5), { 13.0, 2.0, 0 }, 55, { cut = true, name = "4 Gojo POV: the empty stair" }),
+	cam(2705, rel("Blue", 0.0, 0.0, 0.5), { 13.0, 2.0, 0 }, 55),
+	cam(2706, { 19.0, 6.0, 15.0 }, { 18.0, 4.4, 0 }, 44, { cut = true, name = "4 wide: where he actually went" }),
+	cam(2722, { 18.2, 5.6, 9.0 }, { 18.0, 4.6, 0 }, 28),
+	cam(2760, { 19.0, 5.4, 12.0 }, { 19.0, 4.2, 0 }, 40, { name = "4 Gojo down" }),
+	cam(3100, { 19.0, 5.2, 12.0 }, { 19.0, 4.0, 0 }, 40),
+	cam(3101, { 14.0, 5.0, 16.0 }, { 14.0, 3.0, 0 }, 46, { cut = true, name = "4 Toji leaves frame" }),
+	cam(3449, { 4.0, 4.0, 18.0 }, { 4.0, 2.0, 0 }, 46),
+	-- 5: awakening (quiet): hand on tile, eyes, footstep, discovery
+	cam(3450, rel("Blue", 0.4, -2.6, -1.6), rel("Blue", 0.8, -3.0, 0), 20, { cut = true, name = "5 hand on the tile" }),
+	cam(3790, rel("Blue", 0.4, -2.6, -1.6), rel("Blue", 0.8, -3.0, 0), 18),
+	cam(3791, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "5 eyes, no glasses" }),
+	cam(3890, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0.0, 0), 18),
+	cam(3891, { -5.0, 3.0, 11.0 }, { -9.0, 2.6, 0 }, 40, { cut = true, name = "5 Toji hears a footstep" }),
+	cam(4090, { -5.0, 3.0, 11.0 }, { -9.0, 2.6, 0 }, 40),
+	cam(4091, { -2.0, 3.4, 14.0 }, { 4.0, 3.0, 0 }, 46, { cut = true, name = "5 discovered: standing" }),
+	cam(4199, { -1.0, 3.4, 14.0 }, { 5.0, 3.0, 0 }, 44),
+	-- 6: Red: the opening angle again
+	cam(4200, WIDE_A[1], WIDE_A[2], WIDE_A[3], { cut = true, name = "6 opening angle repeated" }),
+	cam(4520, WIDE_A[1], WIDE_A[2], WIDE_A[3]),
+	cam(4521, { -3.0, 4.0, 17.0 }, { 0.5, 2.8, 0 }, 46, { cut = true, name = "6 fast exchange wide" }),
+	cam(5249, { 0.0, 4.0, 16.5 }, { 3.5, 2.8, 0 }, 46),
+	-- 7: arsenal
+	cam(5250, { 2.0, 3.6, 14.0 }, { 4.0, 2.8, 0 }, 44, { cut = true, name = "7 chain revealed" }),
+	cam(5470, { 2.0, 3.6, 14.0 }, { 4.0, 2.8, 0 }, 44),
+	cam(5471, { 3.0, 4.2, 18.0 }, { 4.6, 2.8, 0 }, 48, { cut = true, name = "7 the sweep" }),
+	cam(5679, { 3.0, 4.2, 18.0 }, { 4.6, 2.8, 0 }, 48),
+	cam(5680, { 5.0, 3.6, 13.0 }, { 5.2, 2.8, 0 }, 42, { cut = true, name = "7 the return" }),
+	cam(5949, { 5.0, 3.6, 13.0 }, { 5.2, 2.8, 0 }, 42),
+	cam(5950, { 10.0, 4.4, 20.0 }, { 11.0, 3.2, 0 }, 52, { cut = true, name = "7 airborne crossing (chain divides frame)" }),
+	cam(6120, { 10.5, 4.4, 20.0 }, { 11.0, 3.2, 0 }, 52),
+	cam(6121, { 7.0, 3.8, 14.0 }, { 8.0, 2.8, 0 }, 44, { cut = true, name = "7 nearly his" }),
+	cam(6449, { 5.0, 3.8, 14.0 }, { 7.0, 2.8, 0 }, 44),
+	-- 8: purple
+	cam(6450, { 8.0, 3.4, 13.0 }, { 8.0, 2.8, 0 }, 42, { cut = true, name = "8 Gojo gathers" }),
+	cam(6780, { 8.0, 3.4, 13.0 }, { 8.0, 2.8, 0 }, 42),
+	cam(6781, rel("Purple", 0.5, 0.1, 2.0), rel("Purple", 0, 0, 0), 22, { cut = true, name = "8 Toji recognises it" }),
+	cam(6860, rel("Purple", 0.5, 0.1, 2.0), rel("Purple", 0, 0, 0), 20),
+	cam(6861, { -1.0, 4.4, 24.0 }, { 3.0, 2.8, 0 }, 56, { cut = true, name = "8 wide release: both + the pillar" }),
+	cam(7010, { -1.0, 4.4, 24.0 }, { 3.0, 2.8, 0 }, 56),
+	cam(7011, { 4.0, 3.2, 16.0 }, { 2.0, 1.2, 0 }, 40, { cut = true, name = "8 the cleared path" }),
+	cam(7120, { 6.0, 2.6, 12.0 }, { 11.0, 1.8, 0 }, 40),
+	cam(7121, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 20, { cut = true, name = "8 Gojo's expression" }),
+	cam(7199, rel("Blue", -0.2, 0.1, -2.4), rel("Blue", 0, 0.0, 0), 18),
+	-- epilogue
+	cam(7200, { 6.0, 3.4, 14.0 }, { 6.0, 3.0, 0 }, 42, { cut = true, name = "9 Years later" }),
+	cam(7400, { 6.0, 3.4, 11.0 }, { 6.0, 3.0, 0 }, 38),
+	cam(7401, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 one eye revealed" }),
+	cam(7520, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
+	cam(7521, { 6.0, 3.6, 16.0 }, { 6.0, 3.0, 0 }, 50, { cut = true, name = "9 the field" }),
+	cam(7690, { 6.0, 3.6, 13.0 }, { 6.0, 3.0, 0 }, 46),
+	cam(7691, rel("Blue", -0.2, 0.1, -2.2), rel("Blue", 0, 0, 0), 20, { cut = true, name = "9 same eye framing as the awakening" }),
+	cam(7799, rel("Blue", -0.2, 0.1, -2.0), rel("Blue", 0, 0, 0), 18),
 }
-T.shake = { { f = 128, amp = 0.55, frames = 7 } }      -- one brief impulse, only on the strongest discharge
+D.shake = { { f = 159, amp = 0.35, frames = 5 }, { f = 1744, amp = 0.3, frames = 5 }, { f = 2722, amp = 0.35, frames = 5 }, { f = 4342, amp = 0.4, frames = 6 }, { f = 6900, amp = 0.6, frames = 8 } }
+D.slowmo = { { f0 = 906, f1 = 960, scale = 0.25 }, { f0 = 6860, f1 = 6900, scale = 0.3 } }      -- the first Infinity stop, and the beat before Purple
 
----------------------------------------------------------------------------------------------- effects
--- Every effect reads these frames; positions that depend on the bodies come from the solved rig at runtime.
-T.fx = {
-	dust      = { { f = 6, who = "Blue", kind = "launch" }, { f = 60, who = "Blue", kind = "land" }, { f = 128, who = "Blue", kind = "launch" }, { f = 142, who = "Blue", kind = "land" } },
-	grit      = { from = 15, release = 38, count = 14, stopped = 2 },        -- suspended at the boundary; two stop exactly at the fist's plane
-	field     = { show = 14, ripple = 18, fold = 44, gone = 52 },            -- boundary disc, contact ripple folds inward at 44-50
-	afterimage = { { f = 46, who = "Blue" } },                               -- the single cyan silhouette left at Overdrive takeoff
-	tiles     = {                                                            -- loose tiles hop where Kael lands / is thrown / where the beam carves
-		{ f = 60, kind = "hop", x = "Blue", radius = 6, h = 0.9 },
-		{ f = 91, kind = "hop", x = "Blue", radius = 5, h = 0.5 },
-		{ f = 100, kind = "skid", x = "Blue", radius = 4, h = 0.25 },
-		{ f = 129, kind = "carve", z = -0.5, x0 = 5.0, x1 = -22.0, speed = 70 },
-		{ f = 142, kind = "hop", x = "Blue", radius = 5, h = 0.6 },
-		{ f = 156, kind = "drop" },                                          -- one loose tile falls between them
-	},
-	stones    = { count = 16, pullFrom = 70, pullTo = 88, push = 91, settle = 106 },   -- roll toward the blue point, then are thrown back
-	bluePoint = { f = 70, hold = 104, form = 112, merge = 121 },
-	redPulse  = { f = 91, dur = 5 },
-	core      = { form = 121, fire = 128, collapse = 149 },                  -- blue + red merge into violet at 121; discharge down the lane at 128
-	beam      = { f = 128, hold = 138, gone = 149, z = -0.5, len = 26 },
-	windKael  = { { from = 70, to = 90, wind = 9 } },                        -- scarf pulled taut toward the blue point
+---------------------------------------------------------------------------------------------- state as functions of frame
+function D.glassesState(f)       -- "face" | "flying" | "step" | "settling" | "settled" | "none"
+	if f >= 7200 then return "none" end
+	if f < 2716 then return "face" end
+	if f < 2790 then return "flying" end
+	if f < 7040 then return "step" end
+	if f < 7125 then return "settling" end
+	return "settled"
+end
+function D.spearVisible(f) return (f >= 2490 and f < 3460) or (f >= 4330 and f < 7200) end
+function D.chainVisible(f) return f >= 5340 and f < 6449 end
+function D.curseUncoiled(f) return f >= 2450 and f < 3460 or f >= 5300 and f < 6449 end
+
+---------------------------------------------------------------------------------------------- effects (frames only; the player draws them)
+D.fx = {
+	reflection = { f0 = 30, f1 = 50 },
+	pebble = { f0 = 612, f1 = 700, startOff = { -3.6, 0.2, 0.1 }, stopGap = 0.35 },
+	infinityStops = { { id = "fist-stop", f0 = 906, f1 = 1020 } },
+	blue = { f0 = 1500, f1 = 1740, point = { -5.0, 2.2, 0.0 }, tilt0 = 1560, slab0 = 1600, slab1 = 1700 },
+	flyHeads = { f0 = 2600, f1 = 2760, count = 26 },
+	fold = { f = 2716, dur = 24 },
+	rct = { f0 = 3540, f1 = 3900 },
+	red = { f0 = 4342, f1 = 4372, point = { -5.2, 2.0, 0.3 } },
+	chain = { f0 = 5340, f1 = 6449 },
+	purple = { blue0 = 6530, red0 = 6600, merge = 6820, release = 6900, beam1 = 7010, laneZ = 0.0 },
+	void = { f0 = 7440, f1 = 7799 },
+}
+D.sound = {  -- cues (ids in D.soundIds; blank = silence). music is a separate envelope
+	{ f = 30, cue = "glass_shadow" }, { f = 158, cue = "burst" }, { f = 625, cue = "pebble_stop" }, { f = 909, cue = "infinity_stop" },
+	{ f = 1560, cue = "blue" }, { f = 1745, cue = "land" }, { f = 2716, cue = "spear_fold" }, { f = 4045, cue = "footstep" },
+	{ f = 4342, cue = "red" }, { f = 5474, cue = "chain" }, { f = 6900, cue = "purple" }, { f = 7125, cue = "glasses" }, { f = 7440, cue = "void" },
+}
+D.soundIds = {
+	burst = "rbxasset://sounds/swordlunge.wav", land = "rbxasset://sounds/impact_water.mp3", spear_fold = "rbxasset://sounds/impact_explosion_03.mp3",
+	blue = "rbxasset://sounds/bass.mp3", red = "rbxasset://sounds/swordslash.wav", chain = "rbxasset://sounds/swordslash.wav", purple = "rbxasset://sounds/impact_explosion_03.mp3",
+	footstep = "rbxasset://sounds/snap.mp3", infinity_stop = "rbxasset://sounds/electronicpingshort.wav", pebble_stop = "rbxasset://sounds/electronicpingshort.wav",
+	glasses = "rbxasset://sounds/snap.mp3", void = "rbxasset://sounds/bass.mp3", glass_shadow = "",
+}
+D.music = {  -- master volume envelope (frame, volume): music drops for the awakening, falls silent for Purple's aftermath
+	{ 0, 0.5 }, { 3420, 0.5 }, { 3450, 0 }, { 4090, 0 }, { 4200, 0.5 }, { 6850, 0.5 }, { 6860, 0 }, { 7120, 0 }, { 7200, 0.4 }, { 7799, 0.4 },
 }
 
-T.sound = {
-	{ f = 5,   cue = "launch" }, { f = 36, cue = "hush" }, { f = 46, cue = "field_break" }, { f = 56, cue = "block_hit" },
-	{ f = 70, cue = "pull" }, { f = 91, cue = "push" }, { f = 112, cue = "duck_start" }, { f = 124, cue = "duck_end" },
-	{ f = 121, cue = "core" }, { f = 128, cue = "discharge" }, { f = 142, cue = "land" }, { f = 156, cue = "tile_drop" },
-}
--- built-in client sounds; replace with your own rbxassetid:// ids (uploaded under your account) to taste
-T.soundIds = {
-	launch = "rbxasset://sounds/swordlunge.wav", hush = "", field_break = "rbxasset://sounds/impact_water.mp3", block_hit = "rbxasset://sounds/impact_explosion_03.mp3",
-	pull = "rbxasset://sounds/bass.mp3", push = "rbxasset://sounds/swordslash.wav", core = "rbxasset://sounds/electronicpingshort.wav",
-	discharge = "rbxasset://sounds/impact_explosion_03.mp3", land = "rbxasset://sounds/impact_water.mp3", tile_drop = "rbxasset://sounds/snap.mp3",
-}
-
----------------------------------------------------------------------------------------------- helpers
+---------------------------------------------------------------------------------------------- engine data
 local function copy(t) local r = {} for k, v in pairs(t) do r[k] = v end return r end
--- Engine data: frames become seconds
-function T.engineData()
+function D.engineData()
 	local out = { fighters = {}, contacts = {} }
-	for name, fd in pairs(T.fighters) do
-		local keys = {}
-		for i, k in ipairs(fd.keys) do
-			local nk = copy(k)
-			nk.t, nk.f = k.f / T.fps, nil
-			keys[i] = nk
-		end
-		out.fighters[name] = { baseYaw = fd.baseYaw, anchor = { x = fd.anchor.x, z = fd.anchor.z }, base = fd.base, keys = keys }
-	end
-	for i, c in ipairs(T.contacts) do
+	for name, s in pairs(D.seq) do out.fighters[name] = s:compile() end
+	for i, c in ipairs(D.contacts) do
 		local nc = copy(c)
-		nc.t, nc.f = c.f / T.fps, nil
+		nc.t, nc.f = c.f / D.fps, nil
 		out.contacts[i] = nc
 	end
 	return out
 end
-
-function T.shotAt(frame)
-	local cur
-	for _, k in ipairs(T.camera) do if k.f <= frame then cur = k end end
-	return cur
+function D.playRate(frame)       -- slow-motion scale at this frame (1 = normal)
+	for _, s in ipairs(D.slowmo) do if frame >= s.f0 and frame < s.f1 then return s.scale end end
+	return 1
 end
-
-return T
+return D
 ]====])
 put(RS, "ModuleScript", "BGLook", [====[
 -- BGLook (ModuleScript, ReplicatedStorage): lighting presets + an audit that prints what could blow out the picture.
@@ -2432,7 +2849,7 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 
 local Data = require(ReplicatedStorage:WaitForChild("BGCinematicData"))
-local Config = require(ReplicatedStorage:WaitForChild("BGConfig"))
+local Duel = require(ReplicatedStorage:WaitForChild("BGDuel"))
 
 Players.CharacterAutoLoads = false
 
@@ -2484,94 +2901,67 @@ local function accessory(model, partName, size, offset, color, material, tag, pr
 	return weld(p, to, offset)
 end
 
----------------------------------------------------------------- stage: moonlit stone arena
-Lighting.ClockTime = 0
-Lighting.Brightness = 1.3
+---------------------------------------------------------------- courtyard (overcast dusk: matte stone, nothing glows)
+Lighting.ClockTime = 17.6
+Lighting.Brightness = 1.6
 Lighting.ExposureCompensation = 0
-Lighting.Ambient = Color3.fromRGB(60, 66, 100)
-Lighting.OutdoorAmbient = Color3.fromRGB(70, 76, 112)
-
+Lighting.Ambient = Color3.fromRGB(104, 104, 118)
+Lighting.OutdoorAmbient = Color3.fromRGB(116, 116, 130)
 local function fx(inst)
 	inst:SetAttribute("ShowcaseFX", true)
 	inst.Parent = Lighting
 	return inst
 end
 local atmo = Instance.new("Atmosphere")
-atmo.Density = 0.28; atmo.Offset = 0.2; atmo.Color = Color3.fromRGB(100, 110, 175); atmo.Decay = Color3.fromRGB(40, 45, 90)
+atmo.Density = 0.22; atmo.Offset = 0.15; atmo.Color = Color3.fromRGB(170, 172, 190); atmo.Decay = Color3.fromRGB(120, 120, 140); atmo.Haze = 0.4
 fx(atmo)
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.25; bloom.Size = 12; bloom.Threshold = 1.9
+bloom.Intensity = 0.2; bloom.Size = 12; bloom.Threshold = 2.0          -- low: white hair keeps its detail
 fx(bloom)
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(235, 238, 255)
+cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(240, 238, 245)
 fx(cc)
-local dof = Instance.new("DepthOfFieldEffect")
-dof.FarIntensity = 0.1; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28; dof.Enabled = false
-fx(dof)
 
-local R = Config.arena.radius
-local STONE, STONE2, STONE3 = Color3.fromRGB(58, 60, 74), Color3.fromRGB(40, 42, 56), Color3.fromRGB(78, 80, 98)
-part({ Name = "Ground", Size = Vector3.new(500, 1, 500), Position = Vector3.new(0, -0.5, 0), Color = Color3.fromRGB(28, 30, 42),
-	Material = Enum.Material.Slate, CanCollide = true })
--- raised stone disc
-part({ Name = "ArenaFloor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, (R + 3) * 2, (R + 3) * 2),
-	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(46, 48, 60), Material = Enum.Material.Slate, Reflectance = 0, CanCollide = true })   -- matte stone
-part({ Size = Vector3.new(0.1, (R + 3.4) * 2, (R + 3.4) * 2), Shape = Enum.PartType.Cylinder,
-	CFrame = CFrame.new(0, -0.02, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE3, Material = Enum.Material.Slate })
-part({ Size = Vector3.new(0.12, R * 2, R * 2), Shape = Enum.PartType.Cylinder,
-	CFrame = CFrame.new(0, 0.0, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE2, Material = Enum.Material.Cobblestone })
--- engraved rings: painted stone lines (matte), so only effect geometry glows
-for _, spec in ipairs({ { R * 2 - 1, BLUE }, { R * 1.3, VIOLET }, { 7, Color3.fromRGB(150, 160, 210) } }) do
-	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, spec[1], spec[1]), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = spec[2]:Lerp(STONE2, 0.7), Material = Enum.Material.Concrete })
-	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, spec[1] - 0.35, spec[1] - 0.35), CFrame = CFrame.new(0, 0.06, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = STONE2, Material = Enum.Material.Concrete })
+local STONE, STONE2, STONE3 = Color3.fromRGB(150, 148, 154), Color3.fromRGB(120, 118, 126), Color3.fromRGB(96, 94, 104)   -- pale but never white
+part({ Name = "Ground", Size = Vector3.new(600, 1, 600), Position = Vector3.new(0, -0.5, 0), Color = Color3.fromRGB(96, 98, 104), Material = Enum.Material.Slate, CanCollide = true })
+part({ Name = "CourtFloor", Size = Vector3.new(70, 0.6, 26), Position = Vector3.new(-6, -0.3, 0), Color = STONE2, Material = Enum.Material.Slate })
+local A = Duel.arena
+-- stair: four steps up to the walkway
+local stepN = 4
+for i = 1, stepN do
+	local h = A.stair.topY * i / stepN
+	local x0 = A.stair.x0 + (i - 1) * (A.stair.x1 - A.stair.x0) / stepN
+	local w = (A.stair.x1 - A.stair.x0) / stepN
+	part({ Name = "Step" .. i, Size = Vector3.new(w, h, 12), Position = Vector3.new(x0 + w / 2, h / 2, 0), Color = STONE:Lerp(STONE3, i * 0.08), Material = Enum.Material.Slate })
 end
-part({ Name = "Moon", Shape = Enum.PartType.Ball, Size = Vector3.new(70, 70, 70), Position = Vector3.new(-70, 140, -260),
-	Color = Color3.fromRGB(200, 208, 232), Material = Enum.Material.SmoothPlastic, Transparency = 0 })
-
-math.randomseed(7)
--- broken wall ring and pillars
-for i = 1, 20 do
-	local a = (i / 20) * math.pi * 2
-	local h = (i % 3 == 0) and 1.2 or 2.6
-	if i % 5 ~= 0 then
-		part({ Size = Vector3.new(4.2, h, 1.4), CFrame = CFrame.new(math.cos(a) * (R + 2.2), h / 2, math.sin(a) * (R + 2.2)) * CFrame.Angles(0, -a + math.pi / 2, 0),
-			Color = STONE2, Material = Enum.Material.Cobblestone })
-	end
+part({ Name = "Walkway", Size = Vector3.new(A.walkway.x1 - A.walkway.x0, A.walkway.y, 12), Position = Vector3.new((A.walkway.x0 + A.walkway.x1) / 2, A.walkway.y / 2, 0), Color = STONE, Material = Enum.Material.Slate })
+for _, z in ipairs({ -6.2, 6.2 }) do
+	part({ Size = Vector3.new(A.walkway.x1 - A.walkway.x0, 1.0, 0.5), Position = Vector3.new((A.walkway.x0 + A.walkway.x1) / 2, A.walkway.y + 0.5, z), Color = STONE3, Material = Enum.Material.Slate })
 end
-for i = 1, 8 do
-	local a = (i / 8) * math.pi * 2 + 0.2
-	local h = 14 + (i % 3) * 5
-	local r = R + 7
-	part({ Size = Vector3.new(3, h, 3), CFrame = CFrame.new(math.cos(a) * r, h / 2, math.sin(a) * r) * CFrame.Angles(0, a, math.rad(math.random(-2, 2))),
-		Color = STONE, Material = Enum.Material.Slate })
-	part({ Size = Vector3.new(3.8, 0.8, 3.8), CFrame = CFrame.new(math.cos(a) * r, h + 0.4, math.sin(a) * r) * CFrame.Angles(0, a, 0), Color = STONE3, Material = Enum.Material.Slate })
-end
--- far arch
-part({ Size = Vector3.new(3.4, 18, 3.4), Position = Vector3.new(-8, 9, -34), Color = STONE, Material = Enum.Material.Slate })
-part({ Size = Vector3.new(3.4, 18, 3.4), Position = Vector3.new(8, 9, -34), Color = STONE, Material = Enum.Material.Slate })
-part({ Size = Vector3.new(21, 3, 4), Position = Vector3.new(0, 19.5, -34), Color = STONE3, Material = Enum.Material.Slate })
--- moon-cool and violet-warm lights
-for _, spec in ipairs({ { Vector3.new(-10, 12, 10), Color3.fromRGB(110, 170, 255), 1.5 }, { Vector3.new(10, 12, 10), Color3.fromRGB(170, 120, 255), 1.3 },
-	{ Vector3.new(0, 18, -6), Color3.fromRGB(215, 225, 255), 1.0 } }) do
+-- the broken step the glasses end on (a chipped corner of step 3)
+part({ Name = "BrokenStep", Size = Vector3.new(1.4, 0.3, 1.6), CFrame = CFrame.new(A.step.x, A.step.y + 0.05, 1.6) * CFrame.Angles(0, 0.4, 0.12), Color = STONE3, Material = Enum.Material.Slate })
+-- the broken pillar and its fallen top
+part({ Name = "PillarBase", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3.4, 3.0, 3.0), CFrame = CFrame.new(A.pillar.x, 1.7, -3.2) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE, Material = Enum.Material.Slate })
+part({ Name = "PillarJag", Size = Vector3.new(1.8, 1.3, 1.6), CFrame = CFrame.new(A.pillar.x + 0.2, 3.8, -3.3) * CFrame.Angles(0.3, 0.5, 0.2), Color = STONE2, Material = Enum.Material.Slate })
+part({ Name = "PillarFallen", Shape = Enum.PartType.Cylinder, Size = Vector3.new(4.6, 2.6, 2.6), CFrame = CFrame.new(A.pillar.x - 2.2, 1.3, -5.6) * CFrame.Angles(0, 0.5, math.rad(90)), Color = STONE, Material = Enum.Material.Slate })
+-- the courtyard gate (left): two posts, lintel, and a darker opening
+for _, z in ipairs({ -6, 6 }) do part({ Size = Vector3.new(1.6, 8, 1.6), Position = Vector3.new(A.gate.x - 2, 4, z), Color = STONE3, Material = Enum.Material.Slate }) end
+part({ Name = "GateLintel", Size = Vector3.new(2.2, 1.2, 15), Position = Vector3.new(A.gate.x - 2, 8.4, 0), Color = STONE3, Material = Enum.Material.Slate })
+part({ Name = "GateRoof", Size = Vector3.new(3.4, 0.5, 16), Position = Vector3.new(A.gate.x - 2, 9.3, 0), Color = Color3.fromRGB(70, 68, 78), Material = Enum.Material.Slate })
+-- back wall with two blocks (depth for the wide shots)
+part({ Size = Vector3.new(70, 6, 1.5), Position = Vector3.new(-2, 3, -13), Color = STONE2, Material = Enum.Material.Slate })
+part({ Size = Vector3.new(14, 9, 8), Position = Vector3.new(-24, 4.5, -18), Color = STONE3, Material = Enum.Material.Slate })
+part({ Size = Vector3.new(18, 11, 8), Position = Vector3.new(20, 5.5, -19), Color = STONE3, Material = Enum.Material.Slate })
+-- soft cool sky fill and warm key
+for _, spec in ipairs({ { Vector3.new(-8, 14, 12), Color3.fromRGB(190, 200, 235), 0.8 }, { Vector3.new(12, 14, 12), Color3.fromRGB(255, 226, 200), 0.7 } }) do
 	local lp = part({ Size = Vector3.new(1, 1, 1), Position = spec[1], Transparency = 1 })
+	lp:SetAttribute("Invisible", true)
 	local l = Instance.new("PointLight")
-	l.Color = spec[2]; l.Range = 48; l.Brightness = spec[3]
+	l.Color, l.Range, l.Brightness, l.Shadows = spec[2], 60, spec[3], false
 	l.Parent = lp
 end
--- drifting motes (blue and violet) over the arena: a quiet particle layer that is always present
-for i, col in ipairs({ BLUE, VIOLET }) do
-	local mp = part({ Name = "Motes" .. i, Size = Vector3.new(34, 1, 34), Position = Vector3.new(0, 14, 0), Transparency = 1 })
-	local pe = Instance.new("ParticleEmitter")
-	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	pe.Color = ColorSequence.new(col); pe.LightEmission = 1; pe.Rate = 7
-	pe.Lifetime = NumberRange.new(7, 10); pe.Speed = NumberRange.new(0.4, 1.2)
-	pe.EmissionDirection = Enum.NormalId.Bottom; pe.SpreadAngle = Vector2.new(20, 20)
-	pe.Size = NumberSequence.new(0.16, 0.1); pe.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.45), NumberSequenceKeypoint.new(1, 1) })
-	pe.Parent = mp
-end
 local focus = part({ Name = "FocusPoint", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 4, 0), Transparency = 1 })
+focus:SetAttribute("Invisible", true)
 local function setFocus(plr) pcall(function() plr.ReplicationFocus = focus end) end
 for _, plr in ipairs(Players:GetPlayers()) do setFocus(plr) end
 Players.PlayerAdded:Connect(setFocus)
@@ -2679,138 +3069,176 @@ local function face(model, cfg)
 	accessory(model, "Head", Vector3.new(cfg.mouth[1], 0.05, 0.04), CFrame.new(0.02, cfg.mouth[3], -0.61) * CFrame.Angles(0, 0, math.rad(cfg.mouth[2])), dark)
 end
 
-local MAT = Enum.Material.Fabric       -- clothing and hair are matte; nothing on a character is Neon except the one cyan seam on Kael
 
--- KAEL: broad blocky torso (wide shirt, wide shoulders), matte black swept-back hair with a fringe, warm tan face, fitted navy shirt,
--- short asymmetric scarf, charcoal pants, squared boots. ONE cyan seam on the right sleeve, and a compact angular bracer on the right forearm.
-local function buildKael()
-	local skin = Color3.fromRGB(214, 160, 116)
-	local m = newRig("Blue", { skin = skin, torso = Color3.fromRGB(28, 36, 68), arm = Color3.fromRGB(28, 36, 68), leg = Color3.fromRGB(48, 50, 58) })
-	m:SetAttribute("Character", "Kael")
-	local navy, deep, char, black = Color3.fromRGB(28, 36, 68), Color3.fromRGB(20, 26, 50), Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 32)
-	local hairC = Color3.fromRGB(20, 18, 24)
-	accessory(m, "Head", Vector3.new(1.3, 0.5, 1.3), CFrame.new(0, 0.62, 0.04), hairC, MAT, "Hair")
-	for i = 1, 6 do          -- swept-back layers
-		local x = (i - 3.5) * 0.32
-		accessory(m, "Head", Vector3.new(0.34, 0.95 - math.abs(i - 3.5) * 0.12, 0.5), CFrame.new(x, 0.74, 0.28) * CFrame.Angles(0.8, 0, -x * 0.5), hairC, MAT, "Hair")
+local MAT = Enum.Material.Fabric       -- clothing and hair are matte; nothing on a character glows
+
+-- Round dark glasses. Parts are tagged "Glasses" so the player can hide them from the face and show a loose prop instead.
+local function buildGlasses(model, headPart, tag)
+	local function lens(ex)
+		local rim = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.05, 0.36, 0.36), Color = Color3.fromRGB(10, 10, 12), Material = Enum.Material.SmoothPlastic }, model)
+		weld(rim, headPart, CFrame.new(ex, 0.08, -0.625) * CFrame.Angles(0, math.rad(90), 0))
+		local gl = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.05, 0.28, 0.28), Color = Color3.fromRGB(22, 24, 30), Material = Enum.Material.Glass, Transparency = 0.3 }, model)
+		weld(gl, headPart, CFrame.new(ex, 0.08, -0.65) * CFrame.Angles(0, math.rad(90), 0))
+		rim:SetAttribute(tag, true); gl:SetAttribute(tag, true)
 	end
-	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(-0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, 0.3), hairC, MAT, "Hair")
-	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, -0.3), hairC, MAT, "Hair")
-	-- fringe: three separate locks above the brows, swept to the left
-	accessory(m, "Head", Vector3.new(0.45, 0.2, 0.4), CFrame.new(-0.4, 0.52, -0.5) * CFrame.Angles(-0.25, 0, 0.28), hairC, MAT, "Hair")
-	accessory(m, "Head", Vector3.new(0.4, 0.2, 0.4), CFrame.new(0.02, 0.55, -0.52) * CFrame.Angles(-0.25, 0, 0.12), hairC, MAT, "Hair")
-	accessory(m, "Head", Vector3.new(0.35, 0.18, 0.36), CFrame.new(0.4, 0.52, -0.5) * CFrame.Angles(-0.2, 0, -0.06), hairC, MAT, "Hair")
-	face(m, { eye = { 0.28, 0.2 }, pupil = { 0.15, 0.18 }, brow = { 0.36, 0.08, 14, 0.3 }, mouth = { 0.3, 4, -0.3 }, irisColor = Color3.fromRGB(70, 48, 36) })
-	-- broad torso: wide fitted navy shirt over the torso, broad shoulders
-	accessory(m, "UpperTorso", Vector3.new(2.5, 1.5, 1.12), CFrame.new(0, -0.03, 0.01), navy, MAT)
-	accessory(m, "UpperTorso", Vector3.new(2.62, 0.4, 1.16), CFrame.new(0, 0.62, 0.01), deep, MAT)                         -- shoulder yoke
-	accessory(m, "UpperTorso", Vector3.new(1.0, 0.3, 0.9), CFrame.new(0, 0.88, 0), skin, Enum.Material.SmoothPlastic)      -- neck
-	accessory(m, "LowerTorso", Vector3.new(2.2, 0.42, 1.12), CFrame.new(0, 0.1, 0.01), navy, MAT)
-	accessory(m, "LowerTorso", Vector3.new(2.22, 0.2, 1.14), CFrame.new(0, -0.08, 0), black, Enum.Material.Leather)        -- belt
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.3, 1.0, 1.3), CFrame.new(0, 0.12, 0), navy, MAT)                                        -- fitted sleeve
+	lens(-0.29); lens(0.29)
+	local bridge = part({ Size = Vector3.new(0.2, 0.04, 0.05), Color = Color3.fromRGB(10, 10, 12) }, model)
+	weld(bridge, headPart, CFrame.new(0, 0.1, -0.64)); bridge:SetAttribute(tag, true)
+	for _, s in ipairs({ -1, 1 }) do
+		local t = part({ Size = Vector3.new(0.04, 0.04, 0.7), Color = Color3.fromRGB(10, 10, 12) }, model)
+		weld(t, headPart, CFrame.new(s * 0.62, 0.1, -0.28)); t:SetAttribute(tag, true)
 	end
-	-- the one cyan seam (right sleeve, outer edge) so the viewer can track his lead arm
-	accessory(m, "RightUpperArm", Vector3.new(0.07, 0.95, 0.07), CFrame.new(0.66, 0.12, 0), Color3.fromRGB(70, 215, 255), Enum.Material.Neon, "Seam")
-	-- compact angular bracer: a plate with a forward wedge, matte charcoal
-	local b1 = accessory(m, "RightLowerArm", Vector3.new(1.14, 0.62, 1.14), CFrame.new(0, 0.0, 0), char, Enum.Material.SmoothPlastic, "Bracer")
-	if b1 then b1.Name = "KaelBracer" end
-	accessory(m, "RightLowerArm", Vector3.new(0.5, 0.5, 0.42), CFrame.new(0, -0.02, -0.62) * CFrame.Angles(0.5, 0, 0), black, Enum.Material.SmoothPlastic, "Bracer")
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.06, 1.12, 1.06), CFrame.new(0, 0, 0), char, MAT) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(1.0, 1.0, 1.0), CFrame.new(0, 0.05, 0), char, MAT) end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.18, 0.78, 1.36), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather) end   -- squared boots
-	-- short asymmetric scarf: collar wrap + one long tail (3 segments) and one short tail (2 segments)
-	accessory(m, "UpperTorso", Vector3.new(1.7, 0.4, 1.25), CFrame.new(0, 0.95, 0.04), Color3.fromRGB(40, 50, 90), MAT)
-	local scarfC = Color3.fromRGB(40, 50, 90)
-	local longTail = cloth(m, "UpperTorso", "Scarf1", CFrame.new(-0.3, 0.86, 0.62), 3, Vector3.new(0.5, 0.55, 0.16), scarfC)
-	if longTail then longTail:SetAttribute("PowerSegment", true) end
-	cloth(m, "UpperTorso", "Scarf2", CFrame.new(0.34, 0.86, 0.62), 2, Vector3.new(0.5, 0.5, 0.16), scarfC)
-	addTrail(m, "RightHand", BLUE); addTrail(m, "LeftHand", BLUE)
-	return m
 end
 
--- REN: slightly taller, lean silhouette (tall hair clumps and a narrower torso), silver hair in distinct clumps with grey shadows,
--- visible brows and eyes, dark high collar below the mouth, charcoal split jacket, narrow violet cuffs. His face has its own light.
-local function buildRen()
-	local skin = Color3.fromRGB(236, 204, 178)
-	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(48, 50, 58), arm = Color3.fromRGB(48, 50, 58), leg = Color3.fromRGB(40, 42, 50) })
-	m:SetAttribute("Character", "Ren")
-	local coat, dark, char = Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 34), Color3.fromRGB(40, 42, 50)
-	local silver, shadowGrey = Color3.fromRGB(196, 200, 212), Color3.fromRGB(118, 122, 136)
-	-- hair clumps: each lit clump has a grey shadow clump tucked behind / under it
-	local clumps = {  -- pos, size, rot(x,y,z)
-		{ Vector3.new(0.0, 0.85, -0.2), Vector3.new(0.7, 0.75, 0.6), Vector3.new(-0.3, 0, 0.1) },
-		{ Vector3.new(-0.42, 0.9, 0.0), Vector3.new(0.5, 0.95, 0.55), Vector3.new(0, 0, 0.35) },
-		{ Vector3.new(0.42, 0.95, 0.0), Vector3.new(0.5, 1.05, 0.55), Vector3.new(0, 0, -0.35) },
-		{ Vector3.new(0.0, 1.05, 0.25), Vector3.new(0.6, 0.95, 0.6), Vector3.new(0.5, 0, 0.1) },
-		{ Vector3.new(-0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, 0.5) },
-		{ Vector3.new(0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, -0.5) },
-		{ Vector3.new(0.0, 0.5, 0.5), Vector3.new(1.1, 0.7, 0.4), Vector3.new(0.3, 0, 0) },
-	}
-	accessory(m, "Head", Vector3.new(1.3, 0.45, 1.3), CFrame.new(0, 0.62, 0.04), shadowGrey, MAT, "Hair")
-	for _, c in ipairs(clumps) do
-		accessory(m, "Head", c[2] * 0.95, CFrame.new(c[1] + Vector3.new(0, -0.12, 0.1)) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), shadowGrey, MAT, "Hair")   -- shadow clump
-		accessory(m, "Head", c[2], CFrame.new(c[1]) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), silver, MAT, "Hair")
-	end
-	-- fringe clumps above the brows (brows stay visible below them)
-	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(-0.3, 0.5, -0.5) * CFrame.Angles(-0.25, 0, 0.2), silver, MAT, "Hair")
-	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(0.25, 0.52, -0.5) * CFrame.Angles(-0.25, 0, -0.15), silver, MAT, "Hair")
-	face(m, { eye = { 0.3, 0.17 }, pupil = { 0.17, 0.15 }, brow = { 0.42, 0.1, 10, 0.3 }, mouth = { 0.3, 0, -0.3 }, irisColor = Color3.fromRGB(96, 118, 170), browColor = Color3.fromRGB(80, 82, 94) })
-	-- face light independent of any power: small, soft, white, no shadows
+-- hair clump: a base block and a tapered tip, tilted outward
+local function clump(model, base, tip, offset, rot, c, tag)
+	accessory(model, "Head", base, CFrame.new(offset) * CFrame.Angles(rot.X, rot.Y, rot.Z), c, MAT, tag or "Hair")
+	local dir = CFrame.new(offset) * CFrame.Angles(rot.X, rot.Y, rot.Z) * CFrame.new(0, base.Y / 2 + tip.Y / 2 - 0.05, 0)
+	accessory(model, "Head", tip, dir, c, MAT, tag or "Hair")
+end
+
+-- TEEN GOJO: tall and slender, layered irregular white clumps with cool grey roots and gaps over the forehead, small round dark glasses,
+-- fine pale brows, bright blue irises with dark pupils, small relaxed mouth, dark high-collar uniform. Adult parts (hidden) are tagged "Adult".
+local function buildGojo()
+	local skin = Color3.fromRGB(240, 214, 194)
+	local m = newRig("Blue", { skin = skin, torso = Color3.fromRGB(24, 26, 38), arm = Color3.fromRGB(24, 26, 38), leg = Color3.fromRGB(22, 24, 34) })
+	m:SetAttribute("Character", "Kael"); m:SetAttribute("Persona", "Gojo")
 	local head = m:FindFirstChild("Head")
-	local fl = Instance.new("PointLight")
-	fl.Name = "BGFaceLight"
-	fl.Range, fl.Brightness, fl.Color, fl.Shadows = 6, 0.6, Color3.fromRGB(255, 246, 238), false
-	fl.Parent = head
-	-- lean charcoal split jacket with a dark high collar below the mouth
-	accessory(m, "UpperTorso", Vector3.new(2.0, 1.5, 1.08), CFrame.new(0, -0.03, 0.01), coat, MAT)
-	accessory(m, "UpperTorso", Vector3.new(1.66, 0.62, 1.3), CFrame.new(0, 0.72, 0.0), dark, MAT)                           -- collar top sits just under the mouth
-	accessory(m, "UpperTorso", Vector3.new(0.08, 1.35, 0.08), CFrame.new(0, -0.05, -0.58), Color3.fromRGB(70, 72, 86), Enum.Material.SmoothPlastic)
-	accessory(m, "LowerTorso", Vector3.new(2.0, 0.42, 1.08), CFrame.new(0, 0.1, 0.01), coat, MAT)
-	accessory(m, "LowerTorso", Vector3.new(2.02, 0.18, 1.1), CFrame.new(0, -0.08, 0), dark, Enum.Material.Leather)
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.12, 1.0, 1.12), CFrame.new(0, 0.12, 0), coat, MAT) end
-	-- narrow violet cuffs (matte)
-	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		accessory(m, n, Vector3.new(1.06, 0.14, 1.06), CFrame.new(0, -0.38, 0), Color3.fromRGB(140, 96, 220), Enum.Material.SmoothPlastic, "Seam")
+	local white, root = Color3.fromRGB(238, 240, 248), Color3.fromRGB(148, 156, 178)
+	local uniform, deep, shoe = Color3.fromRGB(24, 26, 38), Color3.fromRGB(16, 18, 28), Color3.fromRGB(20, 20, 26)
+	accessory(m, "Head", Vector3.new(1.3, 0.42, 1.3), CFrame.new(0, 0.62, 0.04), root, MAT, "Hair")               -- cool grey roots
+	local clumps = {
+		{ Vector3.new(-0.5, 0.78, 0.0), Vector3.new(0.4, 0.5, 0.42), Vector3.new(0.5, 0, -0.55), 0.3 }, { Vector3.new(0.5, 0.8, 0.05), Vector3.new(0.42, 0.5, 0.42), Vector3.new(0.4, 0, 0.55), 0.3 },
+		{ Vector3.new(-0.2, 0.88, 0.2), Vector3.new(0.42, 0.55, 0.42), Vector3.new(0.9, 0, -0.2), 0.35 }, { Vector3.new(0.25, 0.9, 0.22), Vector3.new(0.4, 0.55, 0.42), Vector3.new(0.9, 0, 0.3), 0.32 },
+		{ Vector3.new(0.0, 0.85, -0.1), Vector3.new(0.45, 0.5, 0.4), Vector3.new(0.1, 0, 0.1), 0.3 }, { Vector3.new(-0.7, 0.45, 0.15), Vector3.new(0.34, 0.55, 0.45), Vector3.new(0.2, 0, -0.9), 0.3 },
+		{ Vector3.new(0.7, 0.45, 0.15), Vector3.new(0.34, 0.55, 0.45), Vector3.new(0.2, 0, 0.9), 0.3 }, { Vector3.new(-0.3, 0.55, 0.62), Vector3.new(0.5, 0.6, 0.35), Vector3.new(1.2, 0, -0.2), 0.3 },
+		{ Vector3.new(0.35, 0.55, 0.62), Vector3.new(0.5, 0.6, 0.35), Vector3.new(1.2, 0, 0.25), 0.3 },
+	}
+	for _, c in ipairs(clumps) do clump(m, c[2], Vector3.new(c[2].X * 0.5, c[4] * 1.6, c[2].Z * 0.5), c[1], c[3], white) end
+	-- fringe: four separate locks with skin showing between them
+	for i, x in ipairs({ -0.5, -0.16, 0.2, 0.52 }) do
+		accessory(m, "Head", Vector3.new(0.24, 0.34, 0.26), CFrame.new(x, 0.52, -0.54) * CFrame.Angles(-0.35, 0, (i - 2.5) * 0.12), white, MAT, "Hair")
+		accessory(m, "Head", Vector3.new(0.12, 0.2, 0.14), CFrame.new(x + (i - 2.5) * 0.03, 0.34, -0.6) * CFrame.Angles(-0.2, 0, (i - 2.5) * 0.12), white, MAT, "Hair")
 	end
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.0, 1.12, 1.0), CFrame.new(0, 0, 0), char, MAT) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(0.96, 1.0, 0.96), CFrame.new(0, 0.05, 0), char, MAT) end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.1, 0.74, 1.3), CFrame.new(0, 0.1, 0), dark, Enum.Material.Leather) end
-	-- split jacket flaps behind (violet lining shows when they swing)
-	for k, x in ipairs({ -0.5, 0.5 }) do
-		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.92, 0.8, 0.14), coat, Color3.fromRGB(110, 70, 190))
+	face(m, { eye = { 0.3, 0.2 }, pupil = { 0.17, 0.19 }, brow = { 0.34, 0.05, 6, 0.3 }, mouth = { 0.22, 3, -0.3 }, irisColor = Color3.fromRGB(96, 186, 255), browColor = Color3.fromRGB(226, 228, 236) })
+	buildGlasses(m, head, "Glasses")
+	-- teen uniform: dark high-collar jacket, clean shoulder line, fitted trousers, dark shoes
+	local function teen(partName, size, off, c, mat) local p = accessory(m, partName, size, off, c, mat or MAT); if p then p:SetAttribute("Teen", true) end return p end
+	teen("UpperTorso", Vector3.new(1.78, 1.5, 1.06), CFrame.new(0, -0.03, 0.01), uniform)
+	teen("UpperTorso", Vector3.new(1.62, 0.7, 1.18), CFrame.new(0, 0.86, 0.0), deep)                                 -- stand-up collar
+	teen("UpperTorso", Vector3.new(2.0, 0.22, 1.1), CFrame.new(0, 0.66, 0.0), deep)                                 -- clean shoulder line
+	teen("UpperTorso", Vector3.new(0.07, 1.4, 0.07), CFrame.new(0, -0.05, -0.56), Color3.fromRGB(150, 150, 165), Enum.Material.Metal)
+	teen("LowerTorso", Vector3.new(1.8, 0.42, 1.06), CFrame.new(0, 0.1, 0.01), uniform)
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm", "RightLowerArm", "LeftLowerArm" }) do teen(n, Vector3.new(1.04, 1.0, 1.04), CFrame.new(0, 0.1, 0), uniform) end
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do teen(n, Vector3.new(0.96, 1.1, 0.96), CFrame.new(0, 0, 0), deep) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do teen(n, Vector3.new(0.9, 1.0, 0.9), CFrame.new(0, 0.05, 0), deep) end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do teen(n, Vector3.new(1.04, 0.7, 1.22), CFrame.new(0, 0.1, 0), shoe, Enum.Material.Leather) end
+	-- adult outfit + blindfold (epilogue only; hidden until then)
+	local function adult(partName, size, off, c, tag)
+		local p = accessory(m, partName, size, off, c, MAT, tag or "Adult")
+		if p then p:SetAttribute("Adult", true); p.Transparency = 1 end
+		return p
 	end
-	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
+	adult("UpperTorso", Vector3.new(1.86, 1.5, 1.1), CFrame.new(0, -0.03, 0.01), Color3.fromRGB(18, 22, 44))
+	adult("UpperTorso", Vector3.new(1.9, 0.9, 1.3), CFrame.new(0, 0.95, 0.0), Color3.fromRGB(14, 16, 34))
+	adult("LowerTorso", Vector3.new(1.86, 0.5, 1.1), CFrame.new(0, 0.1, 0.01), Color3.fromRGB(18, 22, 44))
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm", "RightLowerArm", "LeftLowerArm" }) do adult(n, Vector3.new(1.06, 1.0, 1.06), CFrame.new(0, 0.1, 0), Color3.fromRGB(18, 22, 44)) end
+	local bl = adult("Head", Vector3.new(0.68, 0.42, 1.34), CFrame.new(-0.33, 0.1, 0.0), Color3.fromRGB(12, 12, 16), "BlindfoldL")
+	local br = adult("Head", Vector3.new(0.68, 0.42, 1.34), CFrame.new(0.33, 0.1, 0.0), Color3.fromRGB(12, 12, 16), "BlindfoldR")
+	for _, p in ipairs({ bl, br }) do p:SetAttribute("Blindfold", true) end
+	addTrail(m, "RightHand", Color3.fromRGB(150, 190, 255)); addTrail(m, "LeftHand", Color3.fromRGB(150, 190, 255))
 	return m
 end
 
+-- TOJI: broad shoulders, tapered waist, strong bare forearms, straight black hair across the forehead, narrow green eyes, a scar at the right
+-- corner of the mouth, fitted black short-sleeve shirt, loose pale trousers gathered at the ankles, dark footwear, and the inventory curse.
+local function buildToji()
+	local skin = Color3.fromRGB(222, 178, 150)
+	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(20, 20, 24), arm = skin, leg = Color3.fromRGB(206, 202, 190) })
+	m:SetAttribute("Character", "Ren"); m:SetAttribute("Persona", "Toji")
+	local hairC, shirt, pale, palerDark, shoe = Color3.fromRGB(22, 20, 22), Color3.fromRGB(20, 20, 24), Color3.fromRGB(206, 202, 190), Color3.fromRGB(176, 172, 160), Color3.fromRGB(30, 30, 34)
+	accessory(m, "Head", Vector3.new(1.3, 0.42, 1.3), CFrame.new(0, 0.64, 0.04), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.3, 0.9, 1.1), CFrame.new(-0.62, 0.3, 0.1), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.3, 0.9, 1.1), CFrame.new(0.62, 0.3, 0.1), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(1.3, 0.9, 0.34), CFrame.new(0, 0.3, 0.5), hairC, MAT, "Hair")
+	for i, x in ipairs({ -0.5, -0.25, 0.0, 0.25, 0.5 }) do       -- straight strands falling across the forehead
+		accessory(m, "Head", Vector3.new(0.22, 0.5 - math.abs(x) * 0.15, 0.12), CFrame.new(x, 0.44 - math.abs(x) * 0.05, -0.6) * CFrame.Angles(-0.12, 0, x * 0.18), hairC, MAT, "Hair")
+	end
+	face(m, { eye = { 0.3, 0.1 }, pupil = { 0.17, 0.1 }, brow = { 0.38, 0.07, 8, 0.25 }, mouth = { 0.26, 0, -0.3 }, irisColor = Color3.fromRGB(70, 138, 92), browColor = Color3.fromRGB(26, 22, 24) })
+	local scar = accessory(m, "Head", Vector3.new(0.05, 0.17, 0.04), CFrame.new(0.19, -0.3, -0.625) * CFrame.Angles(0, 0, 0.5), Color3.fromRGB(190, 110, 110), Enum.Material.SmoothPlastic, "Scar")   -- right corner of the mouth
+	-- broad shoulders, tapered waist, fitted short-sleeve shirt, strong forearms
+	accessory(m, "UpperTorso", Vector3.new(2.6, 1.5, 1.14), CFrame.new(0, -0.03, 0.01), shirt, MAT)
+	accessory(m, "UpperTorso", Vector3.new(2.72, 0.42, 1.18), CFrame.new(0, 0.6, 0.01), Color3.fromRGB(28, 28, 32), MAT)       -- trapezius / shoulder line
+	accessory(m, "UpperTorso", Vector3.new(1.0, 0.36, 0.9), CFrame.new(0, 0.92, 0), skin, Enum.Material.SmoothPlastic)         -- neck
+	accessory(m, "LowerTorso", Vector3.new(1.7, 0.5, 1.0), CFrame.new(0, 0.1, 0.01), shirt, MAT)                               -- tapered waist
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.3, 0.95, 1.3), CFrame.new(0, 0.2, 0), shirt, MAT) end   -- short sleeves
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.18, 0.55, 1.18), CFrame.new(0, -0.35, 0), skin, Enum.Material.SmoothPlastic) end
+	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do accessory(m, n, Vector3.new(1.12, 0.85, 1.12), CFrame.new(0, 0.05, 0), skin, Enum.Material.SmoothPlastic) end
+	-- loose pale trousers, volume in the silhouette, gathered at the ankle
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.6, 1.2, 1.6), CFrame.new(0, 0, 0), pale, MAT) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do
+		accessory(m, n, Vector3.new(1.46, 0.85, 1.46), CFrame.new(0, 0.12, 0), pale, MAT)
+		accessory(m, n, Vector3.new(0.98, 0.3, 0.98), CFrame.new(0, -0.45, 0), palerDark, MAT)                                      -- ankle gather
+	end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.08, 0.72, 1.28), CFrame.new(0, 0.1, 0), shoe, Enum.Material.Leather) end
+	-- the inventory curse: muted purple segmented body around the torso, with a head and tail that trail with a slight delay
+	local curse, curseDark = Color3.fromRGB(112, 96, 134), Color3.fromRGB(84, 72, 104)
+	for i = 1, 3 do
+		local band = accessory(m, "UpperTorso", Vector3.new(2.78, 0.32, 1.5), CFrame.new(0, -0.55 + i * 0.3, 0.02) * CFrame.Angles(0, 0, (i - 2) * 0.12), (i % 2 == 0) and curse or curseDark, MAT, "Curse")
+	end
+	local lastH = cloth(m, "UpperTorso", "CurseHead", CFrame.new(-0.75, 0.7, 0.62), 3, Vector3.new(0.55, 0.55, 0.4), curse)
+	if lastH then
+		local face_ = part({ Size = Vector3.new(0.95, 0.85, 0.8), Color = curse, Material = MAT, Anchored = false, Massless = true }, m)
+		face_:SetAttribute("Curse", true)
+		weld(face_, lastH, CFrame.new(0, -0.62, 0))
+		for _, s in ipairs({ -1, 1 }) do
+			local e = part({ Size = Vector3.new(0.18, 0.1, 0.05), Color = Color3.fromRGB(235, 232, 220), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(e, face_, CFrame.new(s * 0.24, 0.12, -0.42))
+			local pu = part({ Size = Vector3.new(0.07, 0.07, 0.05), Color = Color3.fromRGB(20, 18, 24), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(pu, face_, CFrame.new(s * 0.24, 0.12, -0.44))
+		end
+		local mouth = part({ Size = Vector3.new(0.62, 0.14, 0.05), Color = Color3.fromRGB(40, 30, 50), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+		weld(mouth, face_, CFrame.new(0, -0.2, -0.42))
+		for k = -2, 2 do
+			local tooth = part({ Size = Vector3.new(0.07, 0.1, 0.05), Color = Color3.fromRGB(225, 222, 210), Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, m)
+			weld(tooth, face_, CFrame.new(k * 0.12, -0.18, -0.44))
+		end
+	end
+	cloth(m, "LowerTorso", "CurseTail", CFrame.new(0.4, -0.05, 0.56), 4, Vector3.new(0.5, 0.6, 0.3), curseDark)
+	for _, c in ipairs(m:GetChildren()) do
+		if c:IsA("BasePart") and (c.Name:sub(1, 9) == "CurseHead" or c.Name:sub(1, 9) == "CurseTail") then c:SetAttribute("Curse", true) end
+	end
+	-- the Inverted Spear of Heaven (hidden until the curse produces it): a dark grip with a ring and a short jitte-like blade
+	local grip = accessory(m, "RightHand", Vector3.new(0.14, 0.14, 1.0), CFrame.new(0, -0.1, -0.35), Color3.fromRGB(28, 26, 30), Enum.Material.SmoothPlastic, "Spear")
+	local ring = accessory(m, "RightHand", Vector3.new(0.34, 0.34, 0.06), CFrame.new(0, -0.1, 0.18), Color3.fromRGB(40, 38, 44), Enum.Material.Metal, "Spear")
+	local blade = accessory(m, "RightHand", Vector3.new(0.1, 0.26, 0.8), CFrame.new(0, -0.1, -1.2), Color3.fromRGB(182, 186, 196), Enum.Material.Metal, "Spear")
+	local guard = accessory(m, "RightHand", Vector3.new(0.5, 0.1, 0.14), CFrame.new(0, -0.1, -0.84), Color3.fromRGB(60, 58, 66), Enum.Material.Metal, "Spear")
+	for _, p in ipairs({ grip, ring, blade, guard }) do if p then p.Transparency = 1 end end
+	return m
+end
 
----------------------------------------------------------------- loose floor tiles (cinematic reacts through them)
 local tiles = Instance.new("Folder")
 tiles.Name = "Tiles"
 tiles.Parent = stage
 math.randomseed(21)
-for ix = -7, 7 do
+for ix = -6, 1 do
 	for iz = -1, 1 do
-		local shade = math.random(60, 78)
-		local t = part({ Name = "Tile_" .. ix .. "_" .. iz, Size = Vector3.new(3.84, 0.5, 3.84), CFrame = CFrame.new(ix * 4, 0.02 - 0.25 + 0.02, iz * 4),
-			Color = Color3.fromRGB(shade, shade + 2, shade + 14), Material = Enum.Material.Slate }, tiles)
-		t:SetAttribute("Col", ix)
-		t:SetAttribute("Row", iz)
+		local shade = math.random(138, 160)
+		local t = part({ Name = "Tile_" .. ix .. "_" .. iz, Size = Vector3.new(3.84, 0.4, 3.84), CFrame = CFrame.new(ix * 4 - 2, 0.2, iz * 4),
+			Color = Color3.fromRGB(shade, shade - 2, shade + 6), Material = Enum.Material.Slate }, tiles)
+		t:SetAttribute("Col", ix); t:SetAttribute("Row", iz)
 	end
 end
 
-local kael = buildKael()
-local ren = buildRen()
-kael:PivotTo(CFrame.new(-Config.arena.spawn, 3, 0) * CFrame.Angles(0, math.rad(-90), 0))
-ren:PivotTo(CFrame.new(Config.arena.spawn, 3, 0) * CFrame.Angles(0, math.rad(90), 0))
-for _, m in ipairs({ kael, ren }) do
-	m.HumanoidRootPart.Anchored = true     -- the clients position it each frame
-end
+local gojo = buildGojo()
+local toji = buildToji()
+gojo:PivotTo(CFrame.new(6, 3, 0) * CFrame.Angles(0, math.rad(90), 0))
+toji:PivotTo(CFrame.new(-20, 3, 0) * CFrame.Angles(0, math.rad(-90), 0))
+for _, m in ipairs({ gojo, toji }) do m.HumanoidRootPart.Anchored = true end
 
 stage:SetAttribute("Mode", "Cinematic")
 stage:SetAttribute("Ready", true)
-print("[BG] arena and fighters built (Blue = Kael, Purple = Ren).")
+print("[BG] courtyard and fighters built (Blue = teen Gojo, Purple = Toji).")
 ]====])
 put(SSS, "Script", "BGServer", [====[
 -- BGServer (Script, ServerScriptService): runs the authoritative fight (BGCore) and talks to clients.
@@ -3750,13 +4178,15 @@ stage:GetAttributeChangedSignal("Mode"):Connect(function()
 end)
 print("[BG] client ready. Tab = playable / cinematic. In Studio: use the left panel to pick the fighter, dummy mode and form.")
 ]====])
-put(SP, "LocalScript", "BGCine", [====[
--- BGCine (LocalScript, StarterPlayer > StarterPlayerScripts): plays the 6-second Kael vs Ren cinematic from BGTimeline.
--- ONE timeline drives everything: fighter poses, camera cuts, debris, field, power effects, camera shake and sound cues.
--- Playback uses ELAPSED time (not frame counts), so the scene lasts 6.0 s at any frame rate. It runs only while stage Mode == "Cinematic".
+put(SP, "LocalScript", "BGDuelPlayer", [====[
+-- BGDuelPlayer (LocalScript, StarterPlayer > StarterPlayerScripts): plays BGDuel (teen Gojo vs Toji, 4:00 + 0:20 epilogue).
+-- Playback is by ELAPSED time. Every state (glasses, spear, chain, tiles, lighting, costume) is a pure function of the frame,
+-- so selecting any chapter starts it correctly. Runs while stage Mode == "Cinematic"; Mode "Preview" is the neutral-light character preview.
 --
--- Keys:  R replay   Space pause   , .  step one frame   B slow motion   V effects on/off   F fixed wide camera (for checking animation)
---        N neutral light (all post effects off)   H show / hide the control panel + HUD   C run the contact checks (prints to Output)   Tab -> playable
+--  1-9  jump to chapter    [ ]  previous / next chapter    R  full replay    Space  pause    , .  step a frame
+--  B    slow motion (also automatic on the first Infinity stop and before Purple)    V  effects on/off
+--  F    fixed wide camera (animation check)    N  neutral light    H  show/hide HUD + panel    C  contact checks    P  character preview
+--  Preview: Left/Right = front / profile / fight camera / close-ups, G = glasses on/off, N = neutral light.   Tab = playable mode.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -3764,10 +4194,11 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
+local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
 local Engine = require(ReplicatedStorage:WaitForChild("BGEngine"))
-local T = require(ReplicatedStorage:WaitForChild("BGTimeline"))
+local D = require(ReplicatedStorage:WaitForChild("BGDuel"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
 local Rig = require(ReplicatedStorage:WaitForChild("BGRig"))
 local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
@@ -3775,417 +4206,484 @@ local Look = require(ReplicatedStorage:WaitForChild("BGLook"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
-local function active() return stage:GetAttribute("Mode") == "Cinematic" end
+local function mode() return stage:GetAttribute("Mode") end
+local function active() local m = mode() return m == "Cinematic" or m == "Preview" end
 
-local BLUE, CYAN, VIOLET, RED = Color3.fromRGB(60, 150, 255), Color3.fromRGB(80, 220, 255), Color3.fromRGB(175, 90, 255), Color3.fromRGB(255, 70, 70)
+local BLUE, RED, VIOLET = Color3.fromRGB(70, 150, 255), Color3.fromRGB(255, 70, 70), Color3.fromRGB(170, 90, 255)
 local fighters = { Blue = stage:WaitForChild("Blue"), Purple = stage:WaitForChild("Purple") }
-local motors, cloth, rigs = {}, {}, {}
+local motors, cloth, eyeMotors = {}, {}, { Blue = {}, Purple = {} }
 local R
 for id, model in pairs(fighters) do
 	Rig.waitReady(model)
 	local defs, sizes, m = Rig.read(model)
 	if not R then R = Engine.newRig(defs, sizes) end
 	motors[id], cloth[id] = m, Cloth.new(model)
+	for _, d in ipairs(model:GetDescendants()) do if d:IsA("Motor6D") and d:GetAttribute("EyeJoint") then table.insert(eyeMotors[id], d) end end
 end
-local eyeMotors = {}
-for _, d in ipairs(fighters.Purple:GetDescendants()) do
-	if d:IsA("Motor6D") and d:GetAttribute("EyeJoint") then table.insert(eyeMotors, d) end
-end
-
-local tracks, info = Engine.bake(R, T.engineData())
-local clashC, stopC, bracerC = info[1], info[2], info[3]
-local PLANE_X, PLANE_Y, PLANE_Z = stopC.plane.X, stopC.Hc.Y, stopC.Hc.Z
-print(string.format("[CINE] baked: Kael anchor x=%.2f | field plane x=%.2f y=%.2f | follow-up contact at (%.2f, %.2f, %.2f)", tracks.Blue.anchor.x, PLANE_X, PLANE_Y, clashC.C.X, clashC.C.Y, clashC.C.Z))
+local tracks, info = Engine.bake(R, D.engineData())
+local stopC, spearC = info[1], info[2]
+print(string.format("[DUEL] baked %d frames (%.1f s). fist-stop plane at x=%.2f", D.frames, D.duration, stopC.plane.X))
 
 ---------------------------------------------------------------- state
-local state = { t = 0, playing = true, speed = 1, fx = true, fixed = false, neutral = false, hold = 0, evIdx = 1, lastFrame = -1, loops = 0, wallStart = os.clock() }
+local state = { t = 0, playing = true, speed = 1, fx = true, fixed = false, neutral = false, evIdx = 1, lastFrame = -1, wall0 = os.clock(), loops = 0, view = 1, glasses = true, chapter = 1 }
 local hudOn = false
-local fxFolder = Workspace:FindFirstChild("BGCineFX")
+local fxFolder = Workspace:FindFirstChild("BGDuelFX")
 if fxFolder then fxFolder:Destroy() end
-fxFolder = Instance.new("Folder"); fxFolder.Name = "BGCineFX"; fxFolder.Parent = Workspace
+fxFolder = Instance.new("Folder"); fxFolder.Name = "BGDuelFX"; fxFolder.Parent = Workspace
+local rng = Random.new(7)
+local snap = {}
+local function headOf(id) return snap[id] and snap[id].off:PointToWorldSpace(snap[id].out.cf.Head.Position) or Vector3.new(0, 4, 0) end
+local function bodyAt(id, f) local P = Engine.eval(R, tracks[id], f / D.fps) return P end
+local function headAt(id, f) local P = Engine.eval(R, tracks[id], f / D.fps) return Engine.solve(R, P).cf.Head.Position end
 
----------------------------------------------------------------- pose
-local snapshot = {}
-local function applyPose(t)
+local function applyPose(t, shift)
 	for id, model in pairs(fighters) do
 		local P = Engine.eval(R, tracks[id], t)
 		local out = Engine.solve(R, P)
-		model.HumanoidRootPart.CFrame = out.hrp
+		local off = (shift and shift[id]) or CFrame.new()
+		model.HumanoidRootPart.CFrame = off * out.hrp
 		for jn, rt in pairs(out.rot) do motors[id][jn].Transform = rt end
-		snapshot[id] = { P = P, out = out }
+		snap[id] = { P = P, out = out, off = off }
 	end
 end
-
-local function lerpKeys(keys, frame, field)
+local function keyLerp(keys, frame, field)
 	local a, b = keys[1], keys[#keys]
-	for i, k in ipairs(keys) do
-		if k.f <= frame then a = k; b = keys[math.min(i + 1, #keys)] end
-	end
+	for i, k in ipairs(keys) do if k.f <= frame then a = k; b = keys[math.min(i + 1, #keys)] end end
 	if b.f == a.f then return a[field] end
 	local u = math.clamp((frame - a.f) / (b.f - a.f), 0, 1)
 	u = u * u * (3 - 2 * u)
 	return a[field] + (b[field] - a[field]) * u
 end
 
-local function windFor(frame)
-	local w = 0
-	for _, e in ipairs(T.fx.windKael) do
-		if frame >= e.from - 3 and frame <= e.to + 3 then
-			local ramp = math.min((frame - (e.from - 3)) / 6, ((e.to + 3) - frame) / 6, 1)
-			w = math.max(w, e.wind * math.clamp(ramp, 0, 1))
-		end
-	end
-	return w
-end
-
----------------------------------------------------------------- deterministic scene objects (pure functions of the frame, so scrubbing works)
-local rng = Random.new(12)
-local function neon(parent, size, color, transparency, shape)
+---------------------------------------------------------------- helper builders
+local function mk(shape, size, color, material, transparency)
 	local p = Instance.new("Part")
 	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
-	p.Material, p.Color, p.Transparency = Enum.Material.Neon, color, transparency or 0
-	if shape then p.Shape = shape end
-	p.Size = size
-	p.Parent = parent or fxFolder
-	return p
-end
-local function matte(size, color, shape)
-	local p = Instance.new("Part")
-	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, true
-	p.Material, p.Color, p.Size = Enum.Material.Slate, color, size
+	p.Material, p.Color, p.Transparency, p.Size = material or Enum.Material.SmoothPlastic, color, transparency or 0, size
 	if shape then p.Shape = shape end
 	p.Parent = fxFolder
 	return p
 end
-
--- the field boundary disc, its ripple ring
-local field = Instance.new("Part")
-field.Anchored, field.CanCollide, field.CanQuery, field.CastShadow = true, false, false, false
-field.Shape, field.Material, field.Color, field.Transparency = Enum.PartType.Cylinder, Enum.Material.ForceField, Color3.fromRGB(190, 200, 255), 1
-field.Size = Vector3.new(0.08, 5.6, 5.6)
-field.CFrame = CFrame.new(PLANE_X, PLANE_Y, PLANE_Z)
-field.Parent = fxFolder
-local ripple = neon(fxFolder, Vector3.new(0.05, 1, 1), Color3.fromRGB(210, 220, 255), 1, Enum.PartType.Cylinder)
-local fold = neon(fxFolder, Vector3.new(0.05, 1, 1), CYAN, 1, Enum.PartType.Cylinder)
-
--- suspended grit: arrives slowing down, hangs at the boundary, falls when the field folds. Two pieces stop at the fist's plane.
-local grit = {}
-for i = 1, T.fx.grit.count do
-	local special = i <= T.fx.grit.stopped
-	local hover = Vector3.new(PLANE_X - (special and 0.03 or rng:NextNumber(0.1, 1.1)), PLANE_Y + (special and (i == 1 and 0.55 or -0.45) or rng:NextNumber(-1.1, 1.1)), PLANE_Z + (special and 0.1 * i or rng:NextNumber(-1.2, 1.2)))
-	local g = { part = matte(Vector3.new(0.16, 0.12, 0.14) * rng:NextNumber(0.8, 1.4), Color3.fromRGB(150, 150, 160)), hover = hover,
-		start = hover + Vector3.new(-rng:NextNumber(4, 7), rng:NextNumber(-0.8, 1.2), rng:NextNumber(-1.5, 1.5)),
-		arrive = special and 33 + i or rng:NextInteger(27, 34), spin = Vector3.new(rng:NextNumber(-3, 3), rng:NextNumber(-3, 3), rng:NextNumber(-3, 3)),
-		fallDelay = rng:NextNumber(0, 5), drift = Vector3.new(rng:NextNumber(-0.6, 0.2), 0, rng:NextNumber(-0.4, 0.4)) }
-	grit[i] = g
-end
-local function gritCF(g, f)
-	local fromF, fold_ = T.fx.grit.from, T.fx.field.fold
-	if f < fromF then return nil end
-	if f < g.arrive then
-		local u = math.clamp((f - fromF) / (g.arrive - fromF), 0, 1)
-		local e = 1 - (1 - u) ^ 3                       -- decelerates as it nears the palm
-		return CFrame.new(g.start:Lerp(g.hover, e)) * CFrame.Angles(g.spin.X * u, g.spin.Y * u, g.spin.Z * u)
-	elseif f < fold_ + g.fallDelay then
-		local k = (f - g.arrive) / 30
-		return CFrame.new(g.hover + Vector3.new(0, math.sin(k * 3 + g.arrive) * 0.012, 0)) * CFrame.Angles(g.spin.X, g.spin.Y, g.spin.Z)
-	else
-		local k = (f - (fold_ + g.fallDelay)) / 30
-		local y = math.max(g.hover.Y - 0.5 * 24 * k * k, 0.08)
-		return CFrame.new(g.hover.X + g.drift.X * k * 3, y, g.hover.Z + g.drift.Z * k * 3) * CFrame.Angles(g.spin.X + k * 4, g.spin.Y, g.spin.Z + k * 3)
-	end
-end
-
--- loose stones: roll toward the blue point (pull: curved, accelerating), then are thrown back away from Ren's palm (push: straight, fast)
-local stones = {}
-local function easeIn(u) return u * u end
+local function ease(u) return u * u * (3 - 2 * u) end
 local function easeOut(u) return 1 - (1 - u) ^ 3 end
-for i = 1, T.fx.stones.count do
-	stones[i] = { part = matte(Vector3.new(0.34, 0.26, 0.3) * rng:NextNumber(0.8, 1.5), Color3.fromRGB(96, 98, 110)),
-		home = Vector3.new(rng:NextNumber(-7.5, 1.5), 0.15, rng:NextNumber(-3.2, 3.2)), swirl = rng:NextNumber(0.6, 1.4) * (rng:NextNumber() < 0.5 and -1 or 1),
-		throw = Vector3.new(-rng:NextNumber(5, 11), 0, rng:NextNumber(-3, 3)), spin = rng:NextNumber(2, 6) }
-end
-local function bluePos(f)             -- the blue point behind Kael during the pull (frames 70-104)
-	local k = tracks.Blue
-	local P = Engine.eval(R, k, math.min(f, 106) / 30)
-	return Vector3.new(P.rx - 2.4, 2.5, P.rz)
-end
-local function stoneCF(s, f)
-	local st = T.fx.stones
-	if f < st.pullFrom then return CFrame.new(s.home) end
-	local target = bluePos(st.pullTo)
-	if f < st.push then
-		local u = math.clamp((f - st.pullFrom) / (st.pullTo - st.pullFrom), 0, 1)
-		local e = easeIn(u)
-		local flat = Vector3.new(target.X - s.home.X, 0, target.Z - s.home.Z)
-		local perp = Vector3.new(-flat.Z, 0, flat.X).Unit * s.swirl * (1 - e) * u * 2.2   -- curved path toward the point
-		local pos = s.home + flat * e * 0.82 + perp + Vector3.new(0, 0.15 + e * 1.8 * u, 0)
-		return CFrame.new(pos) * CFrame.Angles(u * s.spin, u * 2, 0)
-	end
-	local base = s.home + Vector3.new(target.X - s.home.X, 0, target.Z - s.home.Z) * 0.82 + Vector3.new(0, 1.95, 0)
-	local u = math.clamp((f - st.push) / (st.settle - st.push), 0, 1)
-	local e = easeOut(u)
-	local y = math.max(0.15, 1.95 * (1 - u) ^ 2 + math.sin(u * math.pi) * 0.6)
-	return CFrame.new(base.X + s.throw.X * e, y, base.Z + s.throw.Z * e) * CFrame.Angles(u * s.spin * 3, 0.5, u * 4)
+local function easeIn(u) return u * u end
+local function clamp01(x) return math.clamp(x, 0, 1) end
+
+---------------------------------------------------------------- scene objects (stateless functions of the frame)
+-- pebble (chapter 2, attempt 1)
+local pebble = mk(Enum.PartType.Ball, Vector3.new(0.16, 0.16, 0.16), Color3.fromRGB(110, 108, 114), Enum.Material.Slate)
+local function updatePebble(f)
+	local p = D.fx.pebble
+	if not state.fx or f < p.f0 or f > p.f1 + 60 then pebble.Transparency = 1; return end
+	pebble.Transparency = 0
+	local hg = headAt("Blue", p.f0 + 28)
+	local target = hg + Vector3.new(-0.5 - p.stopGap, -0.12, 0.55)
+	local start = hg + Vector3.new(p.startOff[1], p.startOff[2], p.startOff[3] + 0.4)
+	local u = clamp01((f - p.f0) / 28)
+	local pos = start:Lerp(target, easeOut(u))                                  -- decelerates and stops beside the cheek
+	if f > p.f1 + 8 then local k = (f - p.f1 - 8) / 30; pos = Vector3.new(target.X, math.max(0.1, target.Y - 0.5 * 22 * k * k), target.Z) end
+	pebble.Position = pos
 end
 
--- tiles
-local tiles = {}
-for _, t in ipairs(stage:WaitForChild("Tiles"):GetChildren()) do
-	table.insert(tiles, { part = t, home = t.CFrame, x = t.Position.X, z = t.Position.Z, jx = rng:NextNumber(-1, 1), jz = rng:NextNumber(-1, 1), col = t:GetAttribute("Col"), row = t:GetAttribute("Row") })
+-- Infinity stops: the field disc, a ripple and the dust suspended at the boundary
+local stopObjs = {}
+do
+	local c = stopC
+	local n = c.n
+	local fieldPart = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 3.2, 3.2), Color3.fromRGB(200, 215, 255), Enum.Material.ForceField, 1)
+	local ripple = mk(Enum.PartType.Cylinder, Vector3.new(0.04, 1, 1), Color3.fromRGB(225, 232, 255), Enum.Material.SmoothPlastic, 1)
+	local dust = {}
+	for i = 1, 16 do
+		local hover = c.plane + Vector3.new(0, rng:NextNumber(-0.9, 0.9), 0) + Vector3.new(-n.Z, 0, n.X) * rng:NextNumber(-0.9, 0.9) - n * rng:NextNumber(0, 0.4)
+		dust[i] = { part = mk(nil, Vector3.new(0.1, 0.08, 0.1) * rng:NextNumber(0.8, 1.6), Color3.fromRGB(176, 172, 164), Enum.Material.Slate), hover = hover,
+			from = hover + n * rng:NextNumber(2.5, 4), arrive = D.fx.infinityStops[1].f0 - 6 + rng:NextInteger(0, 8), fall = rng:NextNumber(0, 18) }
+	end
+	stopObjs = { field = fieldPart, ripple = ripple, dust = dust, n = n, c = c }
 end
-local DROP_COL = 2
-local function tileCF(t, f)
-	local cf = t.home
-	local y, dz, rx, rz = 0, 0, 0, 0
-	for _, e in ipairs(T.fx.tiles) do
-		if f >= e.f then
-			if e.kind == "hop" or e.kind == "skid" then
-				local cx = snapshot.Blue and snapshot.Blue.P.rx or 0
-				local kp = tracks.Blue.keys
-				local P = Engine.eval(R, tracks.Blue, e.f / 30)
-				cx = P.rx
-				local d = math.abs(t.x - cx)
-				if d <= e.radius and not (e.kind == "hop" and e.f == 142 and t.col == DROP_COL and t.row == 0) then
-					local delay = d / e.radius * 4
-					local u = (f - e.f - delay) / 9
-					if u > 0 then
-						local fall = 1 - d / e.radius
-						if u < 1 then y = y + e.h * fall * math.sin(math.pi * u) end
-						rx = rx + t.jx * 0.05 * fall; rz = rz + t.jz * 0.05 * fall      -- stays slightly tilted after settling
-						if e.kind == "skid" then dz = dz + t.jz * 0.25 * fall * math.min(u, 1) end
-					end
-				end
-			elseif e.kind == "carve" and t.row == 0 then
-				local arrive = e.f + math.abs(e.x0 - t.x) / e.speed * 30
-				local u = (f - arrive) / 8
-				if u > 0 and t.x < e.x0 and t.x > e.x1 then
-					if u < 1 then y = y + 1.1 * math.sin(math.pi * u) end
-					dz = dz + (t.col % 2 == 0 and 0.34 or -0.34) * math.min(u, 1)
-					rz = rz + (t.col % 2 == 0 and 0.12 or -0.12) * math.min(u, 1)
-				end
+local function updateStops(f)
+	local s = D.fx.infinityStops[1]
+	local o = stopObjs
+	local on = state.fx and f >= s.f0 - 8 and f <= s.f1
+	local center = o.c.plane
+	o.field.Transparency = on and 0.85 or 1
+	o.field.CFrame = CFrame.lookAt(center, center + o.n) * CFrame.Angles(0, math.rad(90), 0)
+	local ph = ((f - s.f0) % 20) / 20
+	o.ripple.Size = Vector3.new(0.04, 0.5 + 2.8 * ph, 0.5 + 2.8 * ph)
+	o.ripple.CFrame = o.field.CFrame
+	o.ripple.Transparency = on and (0.4 + 0.6 * ph) or 1
+	for _, d in ipairs(o.dust) do
+		if not on then d.part.Transparency = 1
+		else
+			d.part.Transparency = 0
+			if f < d.arrive then
+				local u = clamp01((f - (s.f0 - 14)) / math.max(d.arrive - (s.f0 - 14), 1))
+				d.part.Position = d.from:Lerp(d.hover, easeOut(u))
+			elseif f < s.f1 - 20 + d.fall then
+				d.part.Position = d.hover + Vector3.new(0, math.sin((f - d.arrive) * 0.1) * 0.015, 0)
+			else
+				local k = (f - (s.f1 - 20 + d.fall)) / 30
+				d.part.Position = Vector3.new(d.hover.X, math.max(0.1, d.hover.Y - 0.5 * 22 * k * k), d.hover.Z)
 			end
 		end
 	end
-	if t.col == DROP_COL and t.row == 0 then       -- the loose tile Kael's landing throws up: it drops between the fighters at ~156
-		local f0, f1 = 142, 158
-		if f >= f0 and f <= f1 then
-			local u = (f - f0) / (f1 - f0)
-			y = y + 4 * 4 * u * (1 - u) * 0.9
-			rx = rx + u * 2.2; rz = rz + u * 1.4
-		elseif f > f1 then
-			local b = (f - f1) / 6
-			if b < 1 then y = y + 0.18 * math.sin(math.pi * b) * (1 - b) end
-			rx, rz = rx + 0.2, rz + 0.08
-		end
-	end
-	return cf * CFrame.new(0, y, dz) * CFrame.Angles(rx, 0, rz)
 end
 
--- the two points, the core and the discharge
-local blueB = neon(fxFolder, Vector3.new(0.6, 0.6, 0.6), BLUE, 1, Enum.PartType.Ball)
-local redB = neon(fxFolder, Vector3.new(0.6, 0.6, 0.6), RED, 1, Enum.PartType.Ball)
-local coreB = neon(fxFolder, Vector3.new(0.5, 0.5, 0.5), VIOLET, 1, Enum.PartType.Ball)
-local beam = neon(fxFolder, Vector3.new(1, 0.5, 0.5), VIOLET, 1, Enum.PartType.Cylinder)
-local beamCore = neon(fxFolder, Vector3.new(1, 0.2, 0.2), Color3.new(1, 1, 1), 1, Enum.PartType.Cylinder)
-local carveLine = neon(fxFolder, Vector3.new(1, 0.05, 0.3), VIOLET, 1)
-local pulse = neon(fxFolder, Vector3.new(0.08, 1, 1), RED, 1, Enum.PartType.Cylinder)
-local function renPalmWorld(f)
-	local P = Engine.eval(R, tracks.Purple, f / 30)
-	return P.hands.L.t, P
+-- tiles, slab, Blue
+local tiles = {}
+for _, t in ipairs(stage:WaitForChild("Tiles"):GetChildren()) do
+	table.insert(tiles, { part = t, home = t.CFrame, x = t.Position.X, z = t.Position.Z, col = t:GetAttribute("Col"), row = t:GetAttribute("Row"), j = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)) })
+end
+local slabTile
+for _, t in ipairs(tiles) do if t.col == 1 and t.row == 0 then slabTile = t end end
+local bluePt = Vector3.new(D.fx.blue.point[1], D.fx.blue.point[2], D.fx.blue.point[3])
+local pt1 = mk(Enum.PartType.Ball, Vector3.new(0.5, 0.5, 0.5), BLUE, Enum.Material.Neon, 1)
+local grit = {}
+for i = 1, 16 do
+	grit[i] = { part = mk(nil, Vector3.new(0.12, 0.09, 0.11) * rng:NextNumber(0.8, 1.6), Color3.fromRGB(150, 146, 140), Enum.Material.Slate),
+		home = Vector3.new(rng:NextNumber(-8, 3), 0.12, rng:NextNumber(-3.5, 3.5)), delay = rng:NextNumber(0, 18), swirl = rng:NextNumber(-1, 1) }
+end
+local function tileTilt(t, f)
+	local b = D.fx.blue
+	if f < b.tilt0 then return CFrame.new() end
+	local u = clamp01((f - b.tilt0) / 40)
+	local toPt = Vector3.new(bluePt.X - t.x, 0, bluePt.Z - t.z)
+	local dist = toPt.Magnitude
+	if dist > 14 or dist < 0.01 then return CFrame.new() end
+	local axis = Vector3.new(-toPt.Z, 0, toPt.X).Unit
+	local settle = f > b.f1 - 20 and clamp01(1 - (f - (b.f1 - 20)) / 40) or 1
+	return CFrame.fromAxisAngle and CFrame.fromAxisAngle(axis, math.rad(9) * u * settle * (1 - dist / 14)) or CFrame.new()
+end
+local function updateBlue(f)
+	local b = D.fx.blue
+	local on = state.fx
+	-- grit first
+	for _, g in ipairs(grit) do
+		if not on or f < b.f0 or f > b.f1 + 20 then g.part.Transparency = 1; g.part.Position = g.home
+		else
+			g.part.Transparency = 0
+			local u = clamp01((f - b.f0 - g.delay) / 50)
+			local mid = bluePt:Lerp(g.home, 1 - easeIn(u)) 
+			local perp = Vector3.new(-(bluePt.Z - g.home.Z), 0, bluePt.X - g.home.X).Unit * g.swirl * (1 - u) * u * 2
+			local pos = g.home:Lerp(bluePt, easeIn(u) * 0.85) + perp
+			if f > b.f1 - 10 then local k = clamp01((f - (b.f1 - 10)) / 20); pos = pos:Lerp(Vector3.new(pos.X, 0.1, pos.Z), k) end
+			g.part.Position = pos
+		end
+	end
+	-- loose tiles tilt toward the point, a larger slab slides in and carries Toji up
+	for _, t in ipairs(tiles) do
+		local cf = t.home
+		if on then cf = t.home * tileTilt(t, f) end
+		if on and t == slabTile and f >= b.slab0 then
+			local tj = bodyAt("Purple", 1690)
+			local pTj = Vector3.new(tj.rx, 0.3, tj.rz)
+			local pos
+			if f < 1690 then pos = t.home.Position:Lerp(pTj, easeOut(clamp01((f - b.slab0) / (1690 - b.slab0))))
+			elseif f <= 1744 then local p = bodyAt("Purple", f); pos = Vector3.new(p.rx, math.max(0.3, p.gy - 0.25), p.rz)
+			else local k = clamp01((f - 1744) / 40); local p = bodyAt("Purple", 1744); pos = Vector3.new(p.rx, 0.3, p.rz):Lerp(bluePt * Vector3.new(1, 0, 1) + Vector3.new(0, 0.3, 0), easeOut(k)) end
+			local tilt = (f >= 1690 and f <= 1744) and math.rad(-18) or 0
+			cf = CFrame.new(pos) * CFrame.Angles(0, 0, tilt)
+		end
+		t.part.CFrame = cf
+	end
+	pt1.Transparency = (on and f >= b.f0 + 10 and f <= b.f1 - 20) and 0 or 1
+	pt1.Position = bluePt
+	local s = 0.5 + 0.08 * math.sin(f * 0.4)
+	pt1.Size = Vector3.new(s, s, s)
+end
+
+-- Fly Heads, spear fold, RCT, red core, purple, void
+local fly = {}
+for i = 1, D.fx.flyHeads.count do
+	fly[i] = { part = mk(Enum.PartType.Ball, Vector3.new(0.3, 0.26, 0.3), Color3.fromRGB(96, 82, 112), Enum.Material.SmoothPlastic, 1), r = rng:NextNumber(1.6, 4.2), a = rng:NextNumber(0, 6.28), s = rng:NextNumber(1.2, 3.2), h = rng:NextNumber(-1.2, 1.8) }
+end
+local function updateFly(f)
+	local fh = D.fx.flyHeads
+	local on = state.fx and f >= fh.f0 and f <= fh.f1
+	local c = headOf("Blue")
+	for _, p in ipairs(fly) do
+		if not on then p.part.Transparency = 1
+		else
+			local ramp = math.min((f - fh.f0) / 12, (fh.f1 - f) / 12, 1)
+			p.part.Transparency = 1 - clamp01(ramp)
+			local a = p.a + f / 30 * p.s
+			p.part.Position = c + Vector3.new(math.cos(a) * p.r, p.h + math.sin(a * 1.7) * 0.5, math.sin(a) * p.r * 0.7)
+		end
+	end
+end
+local foldRing = mk(Enum.PartType.Cylinder, Vector3.new(0.05, 1, 1), Color3.fromRGB(240, 244, 255), Enum.Material.Neon, 1)
+local foldDisc = mk(Enum.PartType.Cylinder, Vector3.new(0.06, 1, 1), Color3.fromRGB(190, 205, 255), Enum.Material.ForceField, 1)
+local function updateFold(f)
+	local fo = D.fx.fold
+	if not state.fx or f < fo.f or f > fo.f + fo.dur + 10 then foldRing.Transparency, foldDisc.Transparency = 1, 1; return end
+	local u = clamp01((f - fo.f) / fo.dur)
+	local hc = spearC.Hc
+	local cf = CFrame.new(hc) * CFrame.Angles(0, 0, math.rad(0))
+	local d = 3.2 * (1 - easeOut(u)) + 0.4                      -- a small section folds inward
+	foldRing.Size = Vector3.new(0.05, d, d); foldRing.CFrame = cf; foldRing.Transparency = 0.1 + 0.9 * u
+	foldDisc.Size = Vector3.new(0.06, 3.0, 3.0); foldDisc.CFrame = cf * CFrame.new(-0.25 * (1 - u), 0, 0); foldDisc.Transparency = 0.5 + 0.5 * u
+end
+local rctEm
+do
+	local torso = fighters.Blue:FindFirstChild("UpperTorso")
+	rctEm = Instance.new("ParticleEmitter")
+	rctEm.Name = "BGRct"
+	rctEm.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	rctEm.Color = ColorSequence.new(Color3.fromRGB(215, 255, 232)); rctEm.LightEmission = 0.8; rctEm.Rate = 0
+	rctEm.Lifetime = NumberRange.new(0.8, 1.4); rctEm.Speed = NumberRange.new(0.6, 1.6); rctEm.EmissionDirection = Enum.NormalId.Top
+	rctEm.Size = NumberSequence.new(0.14, 0); rctEm.Transparency = NumberSequence.new(0.3, 1)
+	rctEm.Parent = torso
+end
+local redCore = mk(Enum.PartType.Ball, Vector3.new(0.4, 0.4, 0.4), RED, Enum.Material.Neon, 1)
+local redDust = {}
+for i = 1, 24 do redDust[i] = { part = mk(nil, Vector3.new(0.14, 0.1, 0.12), Color3.fromRGB(150, 146, 140), Enum.Material.Slate, 1), dir = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(0, 0.6), rng:NextNumber(-1, 1)).Unit, d = rng:NextNumber(1.5, 5) } end
+local function updateRed(f)
+	local r = D.fx.red
+	local on = state.fx and f >= r.f0 - 12 and f <= r.f1 + 30
+	local p = Vector3.new(r.point[1], r.point[2], r.point[3])
+	local u = clamp01((f - (r.f0 - 6)) / 14)
+	redCore.Transparency = (on and f >= r.f0 - 8 and f <= r.f1) and 0 or 1
+	local s = 0.3 + 0.5 * math.sin(math.pi * clamp01((f - (r.f0 - 8)) / (r.f1 - r.f0 + 8)))
+	redCore.Size = Vector3.new(s, s, s); redCore.Position = p
+	for _, d in ipairs(redDust) do        -- dust runs AWAY from the core: the reverse of Blue's inward pull
+		if not on or f < r.f0 - 2 then d.part.Transparency = 1
+		else
+			d.part.Transparency = 0
+			local k = easeOut(clamp01((f - (r.f0 - 2)) / 26))
+			d.part.Position = p * Vector3.new(1, 0, 1) + Vector3.new(0, 0.2, 0) + d.dir * d.d * k * Vector3.new(1, 0.4, 1)
+		end
+	end
+end
+
+local ptBlue = mk(Enum.PartType.Ball, Vector3.new(0.5, 0.5, 0.5), BLUE, Enum.Material.Neon, 1)
+local ptRed = mk(Enum.PartType.Ball, Vector3.new(0.5, 0.5, 0.5), RED, Enum.Material.Neon, 1)
+local core = mk(Enum.PartType.Ball, Vector3.new(0.4, 0.4, 0.4), VIOLET, Enum.Material.Neon, 1)
+local beam = mk(Enum.PartType.Cylinder, Vector3.new(1, 0.6, 0.6), VIOLET, Enum.Material.Neon, 1)
+local beamCore = mk(Enum.PartType.Cylinder, Vector3.new(1, 0.2, 0.2), Color3.new(1, 1, 1), Enum.Material.Neon, 1)
+local function updatePurple(f)
+	local P = D.fx.purple
+	local on = state.fx
+	local g = snap.Blue and snap.Blue.out.cf.UpperTorso.Position or Vector3.new(12.4, 4.5, 0)
+	local gp = Engine.solve(R, bodyAt("Blue", math.min(f, 6900)))
+	local center = gp.cf.UpperTorso.Position + Vector3.new(-2.6, 0.7, 0)
+	local show = on and f >= P.blue0 and f < P.merge
+	ptBlue.Transparency, ptRed.Transparency = show and 0 or 1, show and 0 or 1
+	if show then
+		local u = clamp01((f - P.red0) / (P.merge - P.red0))
+		local bu = clamp01((f - P.blue0) / 60)
+		ptBlue.Position = (center + Vector3.new(0.5, 0.2, 1.8)):Lerp(center, ease(u)) * bu + center * (1 - bu)
+		ptRed.Position = (center + Vector3.new(0.5, 0.2, -1.8)):Lerp(center, ease(u))
+		ptRed.Transparency = f >= P.red0 and 0 or 1
+	end
+	core.Transparency = (on and f >= P.merge and f < P.beam1 + 20) and 0 or 1
+	local cs = 0.5 + 0.35 * clamp01((f - P.merge) / (P.release - P.merge)); if f > P.release then cs = 0.9 * (1 - clamp01((f - P.release) / 25)) end
+	core.Size = Vector3.new(cs, cs, cs); core.Position = center
+	if on and f >= P.release and f < P.beam1 + 20 then
+		local grow = easeOut(clamp01((f - P.release) / 6))
+		local len = 42 * grow
+		local thick = (f < P.beam1) and 0.9 or 0.9 * (1 - clamp01((f - P.beam1) / 20))
+		local cx = center.X - len / 2
+		beam.Size = Vector3.new(math.max(len, 0.1), math.max(thick, 0.02), math.max(thick, 0.02)); beam.CFrame = CFrame.new(cx, center.Y, P.laneZ); beam.Transparency = 0.1
+		beamCore.Size = Vector3.new(math.max(len, 0.1), math.max(thick * 0.32, 0.01), math.max(thick * 0.32, 0.01)); beamCore.CFrame = beam.CFrame; beamCore.Transparency = 0
+		-- the clean path: tiles along the lane and the pillar's jagged top are erased as the beam passes
+		for _, t in ipairs(tiles) do
+			if math.abs(t.z - P.laneZ) < 2.6 and t.x > center.X - len then t.part.Transparency = 1 end
+		end
+		local jag = stage:FindFirstChild("PillarJag")
+		if jag and center.X - len < -4 then jag.Transparency = 1 end
+	else
+		beam.Transparency, beamCore.Transparency = 1, 1
+	end
+end
+local function resetLane()
+	for _, t in ipairs(tiles) do t.part.Transparency = 0 end
+	local jag = stage:FindFirstChild("PillarJag"); if jag then jag.Transparency = 0 end
+end
+
+-- chain of a thousand miles (spear tip to the curse's mouth), glasses prop, void field, dummy
+local links = {}
+for i = 1, 20 do links[i] = mk(nil, Vector3.new(0.2, 0.1, 0.4), Color3.fromRGB(58, 60, 70), Enum.Material.Metal, 1) end
+local function spearTip()
+	local hand = fighters.Purple:FindFirstChild("RightHand")
+	return hand and (hand.CFrame * CFrame.new(0, -0.1, -1.5)).Position or Vector3.new()
+end
+local function curseMouth()
+	for _, c in ipairs(fighters.Purple:GetChildren()) do
+		if c:IsA("BasePart") and c.Name == "CurseHead3" then return c.Position end
+	end
+	local ut = fighters.Purple:FindFirstChild("UpperTorso")
+	return ut and ut.Position + Vector3.new(0, 0, 0.7) or Vector3.new()
+end
+local function updateChain(f)
+	local ch = D.fx.chain
+	local on = state.fx and D.chainVisible(f)
+	if not on then for _, l in ipairs(links) do l.Transparency = 1 end return end
+	local p0, p2 = spearTip(), curseMouth()
+	local off = Vector3.new(0, -1.6, 0)
+	if f >= 5466 and f < 5520 then local u = math.sin(math.pi * clamp01((f - 5466) / 54)); off = Vector3.new(-3.2 * u, 0.4, 3.4 * u)               -- the sweep
+	elseif f >= 5800 and f < 5830 then off = Vector3.new(0, 0.1, 0)                                                                                   -- the return: taut
+	elseif f >= 5956 and f < 5992 then off = Vector3.new(-2.5, 2.8, 0.5) end                                                                          -- airborne: a long arc across the frame
+	local mid = (p0 + p2) / 2 + off
+	local prev
+	for i, l in ipairs(links) do
+		local s = (i - 1) / (#links - 1)
+		local a = p0:Lerp(mid, s * 2); local b = mid:Lerp(p2, math.max(s * 2 - 1, 0))
+		local pos = s < 0.5 and a or b
+		l.Transparency = 0
+		local nextS = i / (#links - 1)
+		local nxt = nextS < 0.5 and p0:Lerp(mid, nextS * 2) or mid:Lerp(p2, math.max(nextS * 2 - 1, 0))
+		l.CFrame = CFrame.lookAt(pos, nxt == pos and pos + Vector3.new(0, 0, 1) or nxt) * CFrame.Angles(0, 0, (i % 2) * math.pi / 2)
+	end
+end
+
+local glassesParts, glassesProp = {}, {}
+for _, d in ipairs(fighters.Blue:GetDescendants()) do if d:IsA("BasePart") and d:GetAttribute("Glasses") then table.insert(glassesParts, { part = d, trans = d.Transparency }) end end
+do
+	local function addProp(size, off, color, shape, trans) local p = mk(shape, size, color, Enum.Material.SmoothPlastic, 1); table.insert(glassesProp, { part = p, off = off, trans = trans or 0 }) end
+	for _, ex in ipairs({ -0.29, 0.29 }) do
+		addProp(Vector3.new(0.05, 0.36, 0.36), CFrame.new(ex, 0, 0) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(10, 10, 12), Enum.PartType.Cylinder)
+		addProp(Vector3.new(0.05, 0.28, 0.28), CFrame.new(ex, 0, -0.025) * CFrame.Angles(0, math.rad(90), 0), Color3.fromRGB(22, 24, 30), Enum.PartType.Cylinder, 0.3)
+	end
+	addProp(Vector3.new(0.2, 0.04, 0.05), CFrame.new(0, 0.02, 0), Color3.fromRGB(10, 10, 12))
+end
+local function setGlasses(f)
+	local gs = D.glassesState(f)
+	local showFace = (gs == "face") and state.glasses and mode() ~= "Preview" or (mode() == "Preview" and state.glasses)
+	for _, g in ipairs(glassesParts) do g.part.Transparency = showFace and g.trans or 1 end
+	local root
+	local A = D.arena
+	if gs == "flying" then
+		local u = clamp01((f - 2716) / 74)
+		local h0 = headAt("Blue", 2716)
+		local to = Vector3.new(A.step.x - 0.2, A.step.y + 0.3, 1.6)
+		local pos = h0:Lerp(to, easeOut(u)) + Vector3.new(0, 1.6 * math.sin(math.pi * u), 0)
+		root = CFrame.new(pos) * CFrame.Angles(u * 9, u * 5, u * 3)
+	elseif gs == "step" then root = CFrame.new(A.step.x - 0.2, A.step.y + 0.32, 1.6) * CFrame.Angles(-1.35, 0.4, 0.1)
+	elseif gs == "settling" then
+		local u = clamp01((f - 7040) / 85)
+		root = CFrame.new(A.step.x - 0.2 + 0.5 * easeOut(u), A.step.y + 0.32 - 0.12 * u, 1.6) * CFrame.Angles(-1.35 + 0.5 * u, 0.4 + 0.5 * u, 0.1 + 0.6 * u)
+	elseif gs == "settled" then root = CFrame.new(A.step.x + 0.3, A.step.y + 0.2, 1.6) * CFrame.Angles(-0.85, 0.9, 0.7) end
+	for _, g in ipairs(glassesProp) do
+		g.part.Transparency = (root and state.fx ~= nil and (gs ~= "none") and (gs ~= "face")) and g.trans or 1
+		if root then g.part.CFrame = root * g.off end
+	end
+end
+
+-- epilogue: adult outfit + blindfold, void streaks, a suspended dummy
+local streaks = {}
+for i = 1, 120 do
+	local col = ({ Color3.fromRGB(90, 160, 255), Color3.fromRGB(235, 240, 255), Color3.fromRGB(190, 110, 255), Color3.fromRGB(255, 120, 150) })[rng:NextInteger(1, 4)]
+	streaks[i] = { part = mk(nil, Vector3.new(0.06, 0.06, rng:NextNumber(1, 5)), col, Enum.Material.Neon, 1), dir = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(-1, 1), rng:NextNumber(-1, 1)).Unit,
+		r = rng:NextNumber(4, 22), ph = rng:NextNumber(0, 6.28), sp = rng:NextNumber(0.4, 2.2) }
+end
+local dummy = Instance.new("Model"); dummy.Name = "TrainingDummy"; dummy.Parent = fxFolder
+local dummyParts = {}
+do
+	local function dp(size, pos) local p = mk(nil, size, Color3.fromRGB(150, 150, 156), Enum.Material.SmoothPlastic, 1); p.Parent = dummy; table.insert(dummyParts, { part = p, off = pos }) end
+	dp(Vector3.new(1.8, 2.0, 1.0), Vector3.new(0, 3.2, 0)); dp(Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 4.8, 0)); dp(Vector3.new(0.8, 2.2, 0.8), Vector3.new(-1.3, 3.1, 0)); dp(Vector3.new(0.8, 2.2, 0.8), Vector3.new(1.3, 3.1, 0))
+	dp(Vector3.new(0.9, 2.2, 0.9), Vector3.new(-0.5, 1.1, 0)); dp(Vector3.new(0.9, 2.2, 0.9), Vector3.new(0.5, 1.1, 0))
+end
+local adultParts, teenParts, blindR = {}, {}, {}
+for _, d in ipairs(fighters.Blue:GetDescendants()) do
+	if d:IsA("BasePart") then
+		if d:GetAttribute("Adult") then table.insert(adultParts, { part = d, trans = 0 }) end
+		if d:GetAttribute("Teen") then table.insert(teenParts, { part = d, trans = d.Transparency }) end
+		if d:GetAttribute("BlindfoldR") then table.insert(blindR, d) end
+	end
+end
+local spearParts, curseParts = {}, {}
+for _, d in ipairs(fighters.Purple:GetDescendants()) do if d:IsA("BasePart") and d:GetAttribute("Spear") then table.insert(spearParts, d) end end
+local function updateCostumes(f)
+	local adult = f >= D.duelFrames
+	for _, p in ipairs(adultParts) do p.part.Transparency = adult and 0 or 1 end
+	for _, p in ipairs(teenParts) do p.part.Transparency = adult and 1 or p.trans end
+	for _, p in ipairs(blindR) do p.Transparency = (adult and f < 7401) and 0 or 1 end        -- one eye revealed
+	for _, p in ipairs(spearParts) do p.Transparency = D.spearVisible(f) and 0 or 1 end
+	rctEm.Rate = (state.fx and f >= D.fx.rct.f0 and f <= D.fx.rct.f1) and 10 or 0
+end
+local origLight = { ambient = Lighting.Ambient, out = Lighting.OutdoorAmbient }
+local function updateVoid(f)
+	local v = D.fx.void
+	local on = f >= v.f0 and f <= v.f1
+	local k = clamp01((f - v.f0) / 60)
+	for _, p in ipairs(dummyParts) do
+		p.part.Transparency = (on and mode() == "Cinematic") and 0 or 1
+		p.part.CFrame = CFrame.new(Vector3.new(14, 0, 0) + p.off + Vector3.new(0, math.sin(f * 0.05) * 0.04, 0))
+	end
+	local c = snap.Blue and snap.Blue.out.cf.UpperTorso.Position or Vector3.new(6, 4, 0)
+	for _, s in ipairs(streaks) do
+		if not (on and state.fx) then s.part.Transparency = 1
+		else
+			s.part.Transparency = 1 - k * 0.85
+			local a = s.ph + f / 30 * s.sp
+			local pos = c + s.dir * (s.r + math.sin(a) * 2) + Vector3.new(0, math.cos(a) * 1.5, 0)
+			s.part.CFrame = CFrame.lookAt(pos, pos + s.dir:Cross(Vector3.new(0, 1, 0)) + Vector3.new(0, 0.2, 0))
+		end
+	end
+	-- the courtyard dissolves into the field
+	if f >= v.f0 - 20 then
+		for _, d in ipairs(stage:GetChildren()) do
+			if d:IsA("BasePart") and not d:GetAttribute("Invisible") then
+				d.Transparency = clamp01((f - (v.f0 - 20)) / 60)
+			end
+		end
+	end
+end
+local function restoreStage()
+	for _, d in ipairs(stage:GetChildren()) do
+		if d:IsA("BasePart") and not d:GetAttribute("Invisible") then d.Transparency = 0 end
+	end
+	for _, t in ipairs(tiles) do t.part.Transparency = 0 end
 end
 
 local function updateScene(f)
-	local on = state.fx
-	-- field
-	local F = T.fx.field
-	local vis = on and f >= F.show and f < F.gone
-	local trans = 1
-	if vis then
-		trans = 0.82
-		if f >= F.fold then trans = 0.82 + 0.18 * math.clamp((f - F.fold) / (F.gone - F.fold), 0, 1) end
-		if f < F.show + 3 then trans = 1 - (1 - 0.82) * ((f - F.show) / 3) end
-	end
-	field.Transparency = trans
-	-- boundary ripple: slow thin ring drifting across the disc while it is up; at 44-52 the contact ripple folds inward and flickers cyan
-	local rp = 1
-	if vis and f < F.fold then
-		local ph = ((f - F.show) % 18) / 18
-		local d = 0.8 + 4.8 * ph
-		ripple.Size = Vector3.new(0.04, d, d)
-		ripple.CFrame = CFrame.new(PLANE_X, PLANE_Y, PLANE_Z)
-		rp = 0.55 + 0.45 * ph
-	end
-	ripple.Transparency = (on and vis) and rp or 1
-	local fp = 1
-	if on and f >= F.fold and f < F.gone then
-		local u = (f - F.fold) / (F.gone - F.fold)
-		local d = u < 0.35 and (0.5 + 5.0 * (u / 0.35)) or (5.5 * (1 - (u - 0.35) / 0.65))       -- spreads, then folds inward
-		fold.Size = Vector3.new(0.05, math.max(d, 0.1), math.max(d, 0.1))
-		local bp = bracerC.Hc
-		fold.CFrame = CFrame.new(PLANE_X, bp.Y, bp.Z)
-		fp = 0.1 + 0.8 * u
-	end
-	fold.Transparency = fp
-	-- grit and stones
-	for _, g in ipairs(grit) do
-		local cf = on and gritCF(g, f)
-		g.part.Transparency = cf and 0 or 1
-		if cf then g.part.CFrame = cf end
-	end
-	for _, s in ipairs(stones) do s.part.CFrame = on and stoneCF(s, f) or CFrame.new(s.home) end
-	-- tiles
-	for _, t in ipairs(tiles) do t.part.CFrame = on and tileCF(t, f) or t.home end
-	-- points
-	local BP, CO, BM, RP = T.fx.bluePoint, T.fx.core, T.fx.beam, T.fx.redPulse
-	local bpos, show = bluePos(f), 1
-	if on and f >= BP.f and f <= BP.hold then
-		blueB.Position = bpos
-		local s = 0.7 * math.clamp((f - BP.f) / 5, 0, 1) * (f > BP.hold - 3 and (BP.hold - f) / 3 or 1)
-		blueB.Size = Vector3.new(s, s, s)
-		show = 0
-	elseif on and f > BP.form and f < CO.form then
-		local pc, P = renPalmWorld(CO.form)
-		local ren = P.rx
-		local core = Vector3.new(ren - 1.9, PLANE_Y + 0.35, P.rz + 0.1)
-		local u = math.clamp((f - BP.form) / (CO.form - BP.form), 0, 1)
-		blueB.Position = Vector3.new(ren - 6.5, 3.8, P.rz + 0.3):Lerp(core, easeIn(u) * 0.3 + u * 0.7)
-		blueB.Size = Vector3.new(0.6, 0.6, 0.6)
-		show = 0
-	end
-	blueB.Transparency = show
-	local rshow = 1
-	if on and f > BP.form and f < CO.form then
-		local _, P = renPalmWorld(CO.form)
-		local core = Vector3.new(P.rx - 1.9, PLANE_Y + 0.35, P.rz + 0.1)
-		local start = Vector3.new(P.rx + 2.4, 5.4, P.rz + 0.3)
-		local u = math.clamp((f - BP.form) / (CO.form - BP.form), 0, 1)
-		local arc = Vector3.new(0, math.sin(u * math.pi) * 1.0, 0)
-		redB.Position = start:Lerp(core, easeIn(u) * 0.3 + u * 0.7) + arc
-		redB.Size = Vector3.new(0.6, 0.6, 0.6)
-		rshow = 0
-	end
-	redB.Transparency = rshow
-	-- red pulse: a thin ring leaves Ren's palm toward Kael (a straight push, opposite of the curved pull)
-	local pshow = 1
-	if on and f >= RP.f and f <= RP.f + 6 then
-		local u = (f - RP.f) / 6
-		local pc = renPalmWorld(RP.f)
-		local d = 1.5 + 9 * u
-		pulse.Size = Vector3.new(0.08, d, d)
-		pulse.CFrame = CFrame.new(pc.X - 1.5 - 8 * easeOut(u), pc.Y, pc.Z)
-		pshow = 0.1 + 0.9 * u
-	end
-	pulse.Transparency = pshow
-	-- core and discharge
-	local cshow, bshow, cr = 1, 1, 0
-	local _, PR = renPalmWorld(CO.fire)
-	local corePos = Vector3.new(PR.rx - 1.9, PLANE_Y + 0.35, PR.rz + 0.1)
-	if on and f >= CO.form and f < CO.collapse then
-		cshow = 0
-		local u = math.clamp((f - CO.form) / (CO.fire - CO.form), 0, 1)
-		cr = 0.45 + 0.35 * u
-		if f >= CO.fire then cr = 0.8 * (1 - (f - CO.fire) / (CO.collapse - CO.fire)) + 0.05 end
-		cr = cr * (1 + 0.1 * math.sin(f * 2.1))
-		coreB.Position, coreB.Size = corePos, Vector3.new(cr, cr, cr)
-	end
-	coreB.Transparency = cshow
-	if on and f >= BM.f and f < BM.gone then
-		local grow = math.clamp((f - BM.f) / 3, 0, 1)
-		local len = BM.len * easeOut(grow)
-		local thick = 0.55
-		if f > BM.hold then thick = 0.55 * (1 - (f - BM.hold) / (BM.gone - BM.hold)) end
-		beam.Size = Vector3.new(math.max(len, 0.1), math.max(thick, 0.02), math.max(thick, 0.02))
-		beam.CFrame = CFrame.new(corePos.X - len / 2, corePos.Y, BM.z)
-		beamCore.Size = Vector3.new(math.max(len, 0.1), math.max(thick * 0.35, 0.01), math.max(thick * 0.35, 0.01))
-		beamCore.CFrame = beam.CFrame
-		beam.Transparency, beamCore.Transparency = 0.1, 0
-		-- the single carved line on the floor, following the beam and fading
-		local fade = f > BM.hold and (1 - (f - BM.hold) / (BM.gone - BM.hold)) or 1
-		carveLine.Size = Vector3.new(math.max(len, 0.1), 0.05, 0.3)
-		carveLine.CFrame = CFrame.new(corePos.X - len / 2, 0.1, BM.z)
-		carveLine.Transparency = 0.2 + 0.8 * (1 - fade)
-	else
-		beam.Transparency, beamCore.Transparency, carveLine.Transparency = 1, 1, 1
-	end
+	updatePebble(f); updateStops(f); updateBlue(f); updateFly(f); updateFold(f); updateRed(f); updatePurple(f); updateChain(f); updateVoid(f)
 end
 
----------------------------------------------------------------- one-shot effects (fire when playback crosses their frame)
-local function bodyPos(id, f) local P = Engine.eval(R, tracks[id], f / 30) return Vector3.new(P.rx, 0, P.rz) end
-local function puff(pos, dirX, n)
-	for i = 1, n do
-		local p = Instance.new("Part")
-		p.Anchored, p.CanCollide, p.CanQuery, p.CastShadow = true, false, false, false
-		p.Material, p.Color, p.Transparency = Enum.Material.SmoothPlastic, Color3.fromRGB(120, 120, 130), 0.4
-		local s = rng:NextNumber(0.25, 0.55)
-		p.Shape, p.Size = Enum.PartType.Ball, Vector3.new(s, s, s)
-		p.Position = pos + Vector3.new(rng:NextNumber(-0.3, 0.3), 0.15, rng:NextNumber(-0.4, 0.4))
-		p.Parent = fxFolder
-		local to = p.Position + Vector3.new(dirX * rng:NextNumber(1.5, 3.2), rng:NextNumber(0.2, 0.9), rng:NextNumber(-0.6, 0.6))
-		TweenService:Create(p, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = to, Transparency = 1, Size = Vector3.new(s * 2, s * 2, s * 2) }):Play()
-		Debris:AddItem(p, 0.65)
-	end
-end
-local function ghost(model)
-	local clone = model:Clone()
-	for _, d in ipairs(clone:GetDescendants()) do
-		if d:IsA("BasePart") then
-			d.Anchored, d.CanCollide, d.CanQuery, d.CastShadow = true, false, false, false
-			d.Material, d.Color, d.Transparency = Enum.Material.ForceField, CYAN, 0.35
-			TweenService:Create(d, TweenInfo.new(0.5), { Transparency = 1 }):Play()
-		elseif not d:IsA("Motor6D") and not d:IsA("Attachment") and not d:IsA("WeldConstraint") and not d:IsA("Model") and not d:IsA("Folder") then
-			pcall(function() d:Destroy() end)
-		end
-	end
-	clone.Parent = fxFolder
-	Debris:AddItem(clone, 0.6)
-end
-
-local sounds = {}
-local master = Instance.new("SoundGroup"); master.Name = "BGCineMaster"; master.Volume = 1; master.Parent = SoundService
-local function cue(name)
-	if name == "duck_start" then master.Volume = 0; return end
-	if name == "duck_end" then master.Volume = 1; return end
-	local id = T.soundIds[name]
+---------------------------------------------------------------- sound
+local master = Instance.new("SoundGroup"); master.Name = "BGDuelMaster"; master.Volume = 0.5; master.Parent = SoundService
+local function playCue(name)
+	local id = D.soundIds[name]
 	if not id or id == "" then return end
-	local s = Instance.new("Sound")
-	s.SoundId, s.Volume, s.SoundGroup = id, 0.6, master
-	s.Parent = fxFolder
+	local s = Instance.new("Sound"); s.SoundId, s.Volume, s.SoundGroup, s.Parent = id, 0.7, master, fxFolder
 	pcall(function() s:Play() end)
 	Debris:AddItem(s, 3)
 end
-
-local events = {}
-local function addEvent(f, fn) table.insert(events, { f = f, fn = fn }) end
-for _, e in ipairs(T.fx.dust) do
-	addEvent(e.f, function() if state.fx then puff(bodyPos(e.who, e.f) + Vector3.new(e.kind == "launch" and 0 or 0, 0, 0), -1, e.kind == "land" and 10 or 7); if e.kind == "land" then Style.crack(bodyPos(e.who, e.f), Color3.fromRGB(120, 120, 130), 8, 3) end end end)
+local function musicAt(f)
+	local keys = D.music
+	local a, b = keys[1], keys[#keys]
+	for i, k in ipairs(keys) do if k[1] <= f then a = k; b = keys[math.min(i + 1, #keys)] end end
+	if b[1] == a[1] then return a[2] end
+	return a[2] + (b[2] - a[2]) * clamp01((f - a[1]) / (b[1] - a[1]))
 end
-for _, e in ipairs(T.fx.afterimage) do addEvent(e.f, function() if state.fx then ghost(fighters[e.who]) end end) end
-addEvent(T.fx.field.fold + 2, function() if state.fx then Style.shards(Vector3.new(PLANE_X, bracerC.Hc.Y, bracerC.Hc.Z), CYAN, 12, 9) end end)   -- the bracer disrupts the field
-addEvent(T.contacts[1].f, function() if state.fx then Style.impact(clashC.C, Color3.new(1, 1, 1), 1.0); Style.flash(Color3.new(1, 1, 1), 0.06, 0.3) end end)
-addEvent(T.fx.redPulse.f, function() if state.fx then Style.flash(RED, 0.08, 0.2) end end)
-addEvent(T.fx.core.fire, function() if state.fx then Style.flash(VIOLET, 0.1, 0.35) end end)
-addEvent(T.fx.core.form, function() if state.fx then Style.ringSlash(Vector3.new(0, 0, 0) + Vector3.new(bodyPos("Purple", 121).X - 1.9, PLANE_Y + 0.35, 0.1), VIOLET, 3, 90, 0.3, 0) end end)
-for _, s in ipairs(T.sound) do addEvent(s.f, function() cue(s.cue) end) end
+local events = {}
+for _, s in ipairs(D.sound) do table.insert(events, s) end
 table.sort(events, function(a, b) return a.f < b.f end)
 
 ---------------------------------------------------------------- camera
-local cam = Workspace.CurrentCamera
-local fill = Look.fill()
-local function camAt(frame)
-	local keys = T.camera
-	local a, b = keys[1], nil
-	for i, k in ipairs(keys) do if k.f <= frame then a = k; b = keys[i + 1] end end
-	local function v(t) return Vector3.new(t[1], t[2], t[3]) end
-	if b and not b.cut and b.f > a.f then
-		local u = math.clamp((frame - a.f) / (b.f - a.f), 0, 1)
-		u = u * u * (3 - 2 * u)
-		return v(a.pos):Lerp(v(b.pos), u), v(a.look):Lerp(v(b.look), u), a.fov + (b.fov - a.fov) * u, a.name
+local function resolve(v)
+	if v.rel then
+		local h = headOf(v.rel)
+		-- relative shots face the character: offsets are in the fighter's own frame (x = their right, z = forward toward camera side)
+		local rootCF = fighters[v.rel].HumanoidRootPart.CFrame
+		local yaw = select(2, rootCF:ToOrientation())
+		return h + CFrame.Angles(0, yaw, 0):VectorToWorldSpace(Vector3.new(v.o[1], v.o[2], v.o[3]))
 	end
-	return v(a.pos), v(a.look), a.fov, a.name
+	return Vector3.new(v[1], v[2], v[3])
+end
+local function camAt(frame)
+	local keys = D.camera
+	local a, b
+	for i, k in ipairs(keys) do if k.f <= frame then a = k; b = keys[i + 1] end end
+	a = a or keys[1]
+	local pa, la, fa = resolve(a.pos), resolve(a.look), a.fov
+	if b and not b.cut and b.f > a.f then
+		local u = ease(clamp01((frame - a.f) / (b.f - a.f)))
+		return pa:Lerp(resolve(b.pos), u), la:Lerp(resolve(b.look), u), fa + (b.fov - fa) * u, a.name
+	end
+	return pa, la, fa, a.name
 end
 local function shakeAt(frame)
-	for _, s in ipairs(T.shake) do
+	for _, s in ipairs(D.shake) do
 		if frame >= s.f and frame < s.f + s.frames then
 			local k = 1 - (frame - s.f) / s.frames
 			return Vector3.new(math.sin(frame * 91) * s.amp * k, math.cos(frame * 77) * s.amp * k * 0.7, 0)
@@ -4193,89 +4691,48 @@ local function shakeAt(frame)
 	end
 	return Vector3.zero
 end
+local fill = Look.fill()
+
+---------------------------------------------------------------- preview (neutral light, front / profile / fight camera / close-ups)
+local PREVIEW_VIEWS = { "front Gojo", "profile Gojo", "front Toji", "profile Toji", "fight camera (medium)", "Gojo close-up", "Toji close-up" }
+local function previewCam()
+	local gh, th = headOf("Blue"), headOf("Purple")
+	local v = state.view
+	if v == 1 then return gh + Vector3.new(-5, -0.8, 0), gh + Vector3.new(0, -0.8, 0), 30      -- Gojo faces -X: camera in front of him
+	elseif v == 2 then return gh + Vector3.new(0, -0.8, 6), gh + Vector3.new(0, -0.8, 0), 30
+	elseif v == 3 then return th + Vector3.new(5, -0.8, 0), th + Vector3.new(0, -0.8, 0), 30
+	elseif v == 4 then return th + Vector3.new(0, -0.8, 6), th + Vector3.new(0, -0.8, 0), 30
+	elseif v == 5 then return Vector3.new(-4, 3.6, 17.5), Vector3.new(-4, 2.6, 0), 44
+	elseif v == 6 then return gh + Vector3.new(-1.9, 0, 0.9), gh, 18
+	else return th + Vector3.new(1.4, 0.05, 1.7), th, 16 end
+end
 
 ---------------------------------------------------------------- HUD (hidden unless H)
-local gui = Instance.new("ScreenGui")
-gui.Name = "BGCineHUD"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true
-gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui"); gui.Name = "BGDuelHUD"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true; gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 local hud = Instance.new("TextLabel")
-hud.BackgroundColor3 = Color3.fromRGB(10, 10, 18); hud.BackgroundTransparency = 0.35
-hud.Position = UDim2.new(0, 12, 1, -92); hud.Size = UDim2.new(0, 640, 0, 80)
-hud.TextXAlignment, hud.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
-hud.Font, hud.TextSize, hud.TextColor3, hud.Visible = Enum.Font.Code, 14, Color3.fromRGB(235, 235, 255), false
+hud.BackgroundColor3, hud.BackgroundTransparency = Color3.fromRGB(10, 10, 18), 0.35
+hud.Position, hud.Size = UDim2.new(0, 12, 1, -112), UDim2.new(0, 760, 0, 100)
+hud.TextXAlignment, hud.TextYAlignment, hud.Font, hud.TextSize = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top, Enum.Font.Code, 14
+hud.TextColor3, hud.Visible = Color3.fromRGB(235, 235, 255), false
 hud.Parent = gui
 
----------------------------------------------------------------- checks (key C): measured on the real parts
-local function snapTo(frame)
-	state.playing = false
-	state.t = frame / T.fps
-	for _ = 1, 3 do RunService.RenderStepped:Wait() end
+---------------------------------------------------------------- playback
+local function chapterStart(i) return D.chapters[math.clamp(i, 1, #D.chapters)].f0 end
+local function resetEvents(frame)
+	state.evIdx = 1
+	while state.evIdx <= #events and events[state.evIdx].f <= frame do state.evIdx += 1 end
+	state.lastFrame = frame
 end
-local function runChecks()
-	local keepFx, keepPlay, keepT = state.fx, state.playing, state.t
-	state.fx = false
-	snapTo(T.contacts[2].f)
-	local kr, rl = fighters.Blue.RightHand, fighters.Purple.LeftHand
-	local d = (kr.Position - rl.Position)
-	local flat = Vector3.new(d.X, 0, d.Z).Magnitude
-	print(string.format("[CINE CHECK] stopped fist (f%d): fist centre to palm centre = %.2f studs (solver %.2f). Visible strip between fist surface and palm ~ %.2f studs (target %.2f)",
-		T.contacts[2].f, d.Magnitude, stopC.gap + stopC.fist, d.Magnitude - 0.3, stopC.gap))
-	snapTo(T.contacts[3].f)
-	local br = fighters.Blue:FindFirstChild("KaelBracer")
-	if br then
-		local front = br.Position.X + br.Size.X / 2
-		print(string.format("[CINE CHECK] bracer vs field (f%d): bracer centre x=%.2f, front face x=%.2f, field plane x=%.2f -> offset %.2f studs",
-			T.contacts[3].f, br.Position.X, front, PLANE_X, PLANE_X - front))
-	else
-		print("[CINE CHECK] KaelBracer part not found")
-	end
-	snapTo(T.contacts[1].f)
-	local pur = fighters.Purple
-	local E = (pur.LeftUpperArm.CFrame * motors.Purple.LeftElbow.C0).Position
-	local W = (pur.LeftLowerArm.CFrame * motors.Purple.LeftWrist.C0).Position
-	local dist = Engine.segmentDistance(fighters.Blue.RightHand.Position, E, W)
-	print(string.format("[CINE CHECK] follow-up (f%d): fist-to-forearm gap = %.3f studs (0 = touching, negative = overlap)", T.contacts[1].f, dist - T.contacts[1].guardRadius - T.contacts[1].fist))
-	-- feet: lowest sole point over the whole timeline
-	local lowest, worstAt = 9, 0
-	for f = 0, T.frames - 1, 2 do
-		snapTo(f)
-		for _, id in ipairs({ "Blue", "Purple" }) do
-			for _, n in ipairs({ "RightFoot", "LeftFoot" }) do
-				local part = fighters[id][n]
-				local y = part.Position.Y - part.Size.Y / 2
-				if y < lowest then lowest, worstAt = y, f end
-			end
-		end
-	end
-	print(string.format("[CINE CHECK] lowest foot sole over 6 s = %.3f studs (f%d); negative = sinking into the floor", lowest, worstAt))
-	state.fx, state.t, state.playing = keepFx, keepT, keepPlay
-end
-
----------------------------------------------------------------- loop
-local keepSet = { [field] = true, [ripple] = true, [fold] = true, [blueB] = true, [redB] = true, [coreB] = true, [beam] = true, [beamCore] = true, [carveLine] = true, [pulse] = true }
-for _, g in ipairs(grit) do keepSet[g.part] = true end
-for _, st in ipairs(stones) do keepSet[st.part] = true end
-local function resetPlayback()
-	state.t, state.hold, state.evIdx, state.lastFrame, state.wallStart = 0, 0, 1, -1, os.clock()
-	master.Volume = 1
-	for _, c in ipairs(fxFolder:GetChildren()) do          -- remove transient one-shots (puffs, ghosts, sounds); keep the scene objects
-		if not keepSet[c] then c:Destroy() end
-	end
+local function seekFrame(frame)
+	frame = math.clamp(frame, 0, D.frames - 1)
+	state.t = frame / D.fps
+	resetEvents(frame)
 	for _, id in ipairs({ "Blue", "Purple" }) do cloth[id]:reset() end
+	resetLane()
+	if frame < D.fx.void.f0 - 20 then restoreStage() end
 end
-local function hideScene()
-	local keep = state.fx
-	state.fx = false
-	updateScene(0)
-	state.fx = keep
-end
-
 local function cleanup()
-	-- remove anything left over from playable mode that would wash out the picture or crowd the shot
-	for _, name in ipairs({ "BGEffects", "BGStyleFX" }) do
-		local f = Workspace:FindFirstChild(name)
-		if f then for _, c in ipairs(f:GetChildren()) do c:Destroy() end end
-	end
+	for _, name in ipairs({ "BGEffects", "BGStyleFX" }) do local f = Workspace:FindFirstChild(name); if f then for _, c in ipairs(f:GetChildren()) do c:Destroy() end end end
 	for _, model in pairs(fighters) do
 		for _, d in ipairs(model:GetDescendants()) do
 			if d:IsA("Highlight") or (d:IsA("ParticleEmitter") and (d.Name == "BGAura" or d.Name == "BGSpark")) or (d:IsA("PointLight") and d.Name == "BGGlow") then d:Destroy()
@@ -4283,112 +4740,164 @@ local function cleanup()
 		end
 	end
 end
-
-local function fireEvents(frame)
-	if frame < state.lastFrame then state.evIdx = 1 end        -- scrubbed backwards
-	while state.evIdx <= #events and events[state.evIdx].f <= frame do
-		if events[state.evIdx].f > state.lastFrame then pcall(events[state.evIdx].fn) end
-		state.evIdx += 1
+local function applyLook()
+	if state.neutral or mode() == "Preview" then Look.apply("neutral") else
+		Look.apply("night")      -- (Look's night preset is the dusk look: restrained bloom, no reflective surfaces)
+		Lighting.ClockTime = 17.6; Lighting.Brightness = 1.6; Lighting.Ambient = Color3.fromRGB(104, 104, 118); Lighting.OutdoorAmbient = Color3.fromRGB(116, 116, 130)
 	end
-	state.lastFrame = frame
 end
-
-local wasActive = false
-RunService:BindToRenderStep("BGCinePose", Enum.RenderPriority.Camera.Value - 1, function(dt)
+local was = false
+RunService:BindToRenderStep("BGDuelPose", Enum.RenderPriority.Camera.Value - 1, function(dt)
 	if not active() then
 		hud.Visible = false
-		if wasActive then hideScene() end
-		wasActive = false
+		was = false
 		return
 	end
-	if not wasActive then
-		wasActive = true
-		cleanup()
-		Style.setEnabled(state.fx)
-		Look.apply(state.neutral and "neutral" or "night")
-		Look.audit()
-		resetPlayback()
+	if not was then
+		was = true
+		cleanup(); Style.setEnabled(state.fx); applyLook(); Look.audit()
+		seekFrame(mode() == "Preview" and 0 or math.floor(state.t * D.fps))
 	end
+	if mode() == "Preview" then
+		-- characters stand side by side in neutral light; Toji is moved next to Gojo for the stills
+		applyPose(0, { Blue = CFrame.new(-6, 0, 0) * CFrame.new(0, 0, 0), Purple = CFrame.new(26, 0, 0) })
+		for _, id in ipairs({ "Blue", "Purple" }) do for _, m in ipairs(eyeMotors[id]) do m.Transform = CFrame.new() end end
+		updateCostumes(0)
+		for _, g in ipairs(glassesParts) do g.part.Transparency = state.glasses and g.trans or 1 end
+		hud.Visible = hudOn
+		hud.Text = string.format(" PREVIEW (neutral light)  view %d/%d: %s | Left/Right change view, G glasses, N neutral/night, P back to the duel", state.view, #PREVIEW_VIEWS, PREVIEW_VIEWS[state.view])
+		return
+	end
+	local frame0 = state.t * D.fps
 	if state.playing then
-		if state.hold > 0 then
-			state.hold -= dt
-			if state.hold <= 0 then resetPlayback() end
-		else
-			state.t = math.min(state.t + dt * state.speed, T.duration)       -- real elapsed time, not frame counts
-		end
+		local rate = state.speed * D.playRate(frame0)
+		state.t = math.min(state.t + dt * rate, D.duration)       -- elapsed time; slow motion only where the timeline asks for it
 	end
-	local frame = state.t * T.fps
-	applyPose(state.t)
+	local frame = state.t * D.fps
 	local f = math.floor(frame)
-	fireEvents(frame)
-	-- eyes, cloth
-	local ex, ey = lerpKeys(T.eyes, frame, "x"), lerpKeys(T.eyes, frame, "y")
-	for _, m in ipairs(eyeMotors) do m.Transform = CFrame.new(ex, ey, 0) end
-	cloth.Blue:update(snapshot.Blue.out.cf.UpperTorso, state.playing and dt * state.speed or 0, windFor(frame))
-	cloth.Purple:update(snapshot.Purple.out.cf.LowerTorso, state.playing and dt * state.speed or 0, 0)
-	updateScene(frame)
-	-- trails off in the cinematic (clean silhouettes)
-	Style.enabled = state.fx
-	if state.playing and state.t >= T.duration and state.hold <= 0 then
+	applyPose(state.t)
+	-- eyes: they move before the head does (keys in BGDuel.eyes)
+	for _, id in ipairs({ "Blue", "Purple" }) do
+		local ex, ey = keyLerp(D.eyes[id], frame, "x"), keyLerp(D.eyes[id], frame, "y")
+		for _, m in ipairs(eyeMotors[id]) do m.Transform = CFrame.new(-ex, ey, 0) end
+	end
+	local wind = D.curseUncoiled(f) and 7 or 0
+	cloth.Blue:update(snap.Blue.out.cf.UpperTorso, state.playing and dt or 0, 0)
+	cloth.Purple:update(snap.Purple.out.cf.UpperTorso, state.playing and dt or 0, wind)
+	updateCostumes(f); setGlasses(f)
+	updateScene(f)
+	-- one-shots
+	if f < state.lastFrame then resetEvents(f) end
+	while state.evIdx <= #events and events[state.evIdx].f <= f do
+		if events[state.evIdx].f > state.lastFrame then playCue(events[state.evIdx].cue) end
+		state.evIdx += 1
+	end
+	state.lastFrame = f
+	master.Volume = musicAt(f)
+	-- shock: Gojo's glasses leave his face with a flash on the spear contact (frame 2716), Purple's flash at the release
+	if state.fx and (f == 2716 or f == 6900) and state.playing then Style.flash(Color3.new(1, 1, 1), 0.06, 0.25) end
+	if state.playing and state.t >= D.duration then
 		state.loops += 1
-		if state.loops == 1 then print(string.format("[CINE] first playthrough took %.2f s of real time (timeline %.2f s)", os.clock() - state.wallStart - 0, T.duration)) end
-		state.hold = 0.8
+		if state.loops == 1 then print(string.format("[DUEL] first full playthrough: %.2f s of real time (timeline %.1f s, slow-motion windows included)", os.clock() - state.wall0, D.duration)) end
+		state.playing = false
 	end
 	if hudOn then
+		local ch = D.chapterAt(f)
 		local _, _, _, shot = camAt(frame)
 		hud.Visible = true
-		hud.Text = string.format(" frame %3d / %d  t=%.2fs  %s | shot: %s\n fx %s | camera %s | light %s | speed %.2fx %s\n R replay  Space pause  , . step  B slow  V fx  F fixed cam  N neutral light  C checks  H hide  Tab playable",
-			f, T.frames - 1, state.t, state.playing and "PLAY" or "PAUSED", shot, state.fx and "ON" or "OFF", state.fixed and "FIXED" or "SHOTS", state.neutral and "NEUTRAL" or "NIGHT", state.speed, "")
+		hud.Text = string.format(" %d:%02d  frame %d/%d | chapter %d: %s\n question: %s\n shot: %s | fx %s | cam %s | light %s | speed %.2fx\n 1-9 chapter  [ ] prev/next  R replay  Space  , .  B slow  V fx  F fixed cam  N neutral  C checks  P preview  H hide",
+			math.floor(state.t / 60), math.floor(state.t % 60), f, D.frames - 1, ch.id, ch.name, ch.q, shot or "", state.fx and "ON" or "OFF", state.fixed and "FIXED" or "SHOTS", state.neutral and "NEUTRAL" or "DUSK", state.speed)
 	else
 		hud.Visible = false
 	end
 end)
 
-RunService:BindToRenderStep("BGCineCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
+RunService:BindToRenderStep("BGDuelCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
 	if not active() then return end
-	cam = Workspace.CurrentCamera
+	local cam = Workspace.CurrentCamera
 	if not cam then return end
 	cam.CameraType = Enum.CameraType.Scriptable
-	local frame = state.t * T.fps
 	local pos, look, fov
-	if state.fixed then
-		pos, look, fov = Vector3.new(-1.5, 3.8, 18), Vector3.new(-1.5, 2.8, 0), 50
+	if mode() == "Preview" then pos, look, fov = previewCam()
+	elseif state.fixed then pos, look, fov = Vector3.new(0, 5, 34), Vector3.new(0, 2.8, 0), 50
 	else
+		local frame = state.t * D.fps
 		pos, look, fov = camAt(frame)
+		pos = pos + shakeAt(frame)
 	end
-	pos = pos + shakeAt(frame)
 	cam.CFrame = CFrame.lookAt(pos, look)
 	cam.FieldOfView = fov
 	fill.Position = pos + cam.CFrame.LookVector * 2
 end)
 
+---------------------------------------------------------------- checks (key C)
+local function runChecks()
+	local keep = { state.fx, state.playing, state.t }
+	state.fx, state.playing = false, false
+	local function go(frame) state.t = frame / D.fps; for _ = 1, 3 do RunService.RenderStepped:Wait() end end
+	go(906)
+	local fist = fighters.Purple.RightHand.Position
+	local gh = fighters.Blue.Head
+	print(string.format("[DUEL CHECK] Infinity stop f906: fist centre to Gojo's head surface = %.2f studs (target gap %.2f + fist %.2f)", (fist - gh.Position).Magnitude - 0.6, stopC.gap, stopC.fist))
+	go(2716)
+	print(string.format("[DUEL CHECK] spear contact f2716: Toji fist to Gojo's torso centre = %.2f studs", (fighters.Purple.RightHand.Position - fighters.Blue.UpperTorso.Position).Magnitude))
+	local low, at = 9, 0
+	for f = 0, D.frames - 1, 6 do
+		go(f)
+		for _, id in ipairs({ "Blue", "Purple" }) do
+			local gy = Engine.eval(R, tracks[id], f / D.fps).gy
+			for _, n in ipairs({ "RightFoot", "LeftFoot" }) do
+				local p = fighters[id][n]
+				local y = p.Position.Y - p.Size.Y / 2 - gy
+				if y < low then low, at = y, f end
+			end
+		end
+	end
+	print(string.format("[DUEL CHECK] lowest foot sole above its ground over the whole timeline = %.3f studs (frame %d)", low, at))
+	state.fx, state.playing, state.t = keep[1], keep[2], keep[3]
+end
+
 ---------------------------------------------------------------- controls
+local CHAPTER_KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine }
+local function gotoChapter(i) state.chapter = i; seekFrame(chapterStart(i)); state.playing = true end
+local function currentChapter() return D.chapterAt(math.floor(state.t * D.fps)).id end
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp or not active() then return end
 	local k = input.KeyCode
-	if k == Enum.KeyCode.R then resetPlayback(); state.playing = true
+	if mode() == "Preview" then
+		if k == Enum.KeyCode.Right then state.view = state.view % #PREVIEW_VIEWS + 1
+		elseif k == Enum.KeyCode.Left then state.view = (state.view - 2) % #PREVIEW_VIEWS + 1
+		elseif k == Enum.KeyCode.G then state.glasses = not state.glasses
+		elseif k == Enum.KeyCode.N then state.neutral = not state.neutral; applyLook()
+		elseif k == Enum.KeyCode.P then stage:SetAttribute("Mode", "Cinematic")
+		elseif k == Enum.KeyCode.H then hudOn = not hudOn; stage:SetAttribute("UIVisible", hudOn) end
+		return
+	end
+	for i, kc in ipairs(CHAPTER_KEYS) do if k == kc then gotoChapter(i) return end end
+	if k == Enum.KeyCode.R then seekFrame(0); state.playing = true; state.loops = 0; state.wall0 = os.clock()
+	elseif k == Enum.KeyCode.LeftBracket then gotoChapter(math.max(1, currentChapter() - 1))
+	elseif k == Enum.KeyCode.RightBracket then gotoChapter(math.min(#D.chapters, currentChapter() + 1))
 	elseif k == Enum.KeyCode.Space then state.playing = not state.playing
-	elseif k == Enum.KeyCode.Comma then state.playing = false; state.t = math.max(0, state.t - 1 / T.fps)
-	elseif k == Enum.KeyCode.Period then state.playing = false; state.t = math.min(T.duration, state.t + 1 / T.fps)
+	elseif k == Enum.KeyCode.Comma then state.playing = false; state.t = math.max(0, state.t - 1 / D.fps)
+	elseif k == Enum.KeyCode.Period then state.playing = false; state.t = math.min(D.duration, state.t + 1 / D.fps)
 	elseif k == Enum.KeyCode.B then state.speed = (state.speed == 1) and 0.25 or 1
 	elseif k == Enum.KeyCode.V then state.fx = not state.fx; Style.setEnabled(state.fx)
 	elseif k == Enum.KeyCode.F then state.fixed = not state.fixed
-	elseif k == Enum.KeyCode.N then state.neutral = not state.neutral; Look.apply(state.neutral and "neutral" or "night"); Look.audit()
+	elseif k == Enum.KeyCode.N then state.neutral = not state.neutral; applyLook(); Look.audit()
 	elseif k == Enum.KeyCode.H then hudOn = not hudOn; stage:SetAttribute("UIVisible", hudOn)
 	elseif k == Enum.KeyCode.C then task.spawn(runChecks)
-	end
+	elseif k == Enum.KeyCode.P then stage:SetAttribute("Mode", "Preview") end
 end)
-
--- buttons from the control panel (BGClient) arrive as stage attribute CinCmd = "<command>:<time>"
 stage:GetAttributeChangedSignal("CinCmd"):Connect(function()
 	if not active() then return end
-	local cmd = tostring(stage:GetAttribute("CinCmd")):match("^(%a+)")
-	if cmd == "replay" then resetPlayback(); state.playing = true
+	local cmd, arg = tostring(stage:GetAttribute("CinCmd")):match("^(%a+):?(%d*)")
+	if cmd == "replay" then seekFrame(0); state.playing = true
 	elseif cmd == "slow" then state.speed = (state.speed == 1) and 0.25 or 1
 	elseif cmd == "vfx" then state.fx = not state.fx; Style.setEnabled(state.fx)
+	elseif cmd == "chapter" and tonumber(arg) then gotoChapter(tonumber(arg))
 	elseif cmd == "inspect" then task.spawn(runChecks) end
 end)
-stage:GetAttributeChangedSignal("Mode"):Connect(function() if active() then wasActive = false end end)
-print("[CINE] ready: 6.0 s timeline (180 frames @ 30 fps). H shows the HUD, Tab switches to playable.")
+stage:GetAttributeChangedSignal("Mode"):Connect(function() if active() then was = false end end)
+print("[DUEL] ready: 4:00 duel + 0:20 epilogue. 1-9 chapters, P preview, H HUD, Tab playable.")
 ]====])
 print("[BG] installed. Press Test > Play. It opens in the cinematic replay; press Tab or the Playable button to fight.")

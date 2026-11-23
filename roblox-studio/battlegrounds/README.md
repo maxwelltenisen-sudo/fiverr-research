@@ -26,36 +26,56 @@ power forms and ultimates, and an 8-12 s cinematic replay of the fist-to-forearm
 | ReplicatedStorage | ModuleScript | BGCloth | BGCloth.lua (scarf / coat lag) |
 | ReplicatedStorage | ModuleScript | BGRig | BGRig.lua (reads R15 joints) |
 | ReplicatedStorage | ModuleScript | BGStyle | BGStyle.lua (shards, ring slashes, floor cracks, speed lines, flashes, ink frame) |
-| ReplicatedStorage | ModuleScript | BGTimeline | BGTimeline.lua (**THE 6-second cinematic: poses, contacts, camera cuts, debris, effects, shake, sound cues, all by frame**) |
+| ReplicatedStorage | ModuleScript | BGDuel | BGDuel.lua (**THE 4-minute timeline: poses, chapters, camera, effects, costume states, sound, slow motion, by frame**) |
 | ReplicatedStorage | ModuleScript | BGLook | BGLook.lua (night / neutral lighting presets + the light audit) |
 | ReplicatedStorage | ModuleScript | BGCinematicData | BGCinematicData.lua (colour palette only; the old cinematic data is no longer played) |
 | ServerScriptService | Script | BGBuilder | BGBuilder.server.lua (arena + the two rigs and costumes) |
 | ServerScriptService | Script | BGServer | BGServer.server.lua (runs BGCore, validates input) |
 | StarterPlayer > StarterPlayerScripts | LocalScript | BGClient | BGClient.client.lua (playable mode: input, posing, VFX, forms, camera, UI) |
-| StarterPlayer > StarterPlayerScripts | LocalScript | BGCine | BGCine.client.lua (plays BGTimeline by elapsed time) |
+| StarterPlayer > StarterPlayerScripts | LocalScript | BGDuelPlayer | BGDuelPlayer.client.lua (plays BGDuel by elapsed time; chapters, preview) |
 
 Older story/showcase Scripts and LocalScripts are disabled by the installer, not deleted.
 
 ## Controls
 Playable: **WASD** move (W = toward the opponent) | **LMB** combo | **Q E R C** skills | **hold F** guard | **G** counter / riposte | **X** first form (50%) | **Z** final form (100%) | **T** ultimate | **Tab** playable <-> cinematic.
-Cinematic: **R** replay | **Space** pause | **, .** step one frame | **B** slow motion | **V** effects on/off | **F** fixed wide camera (check the animation alone) | **N** neutral light (all post effects off) | **H** show/hide the control panel and HUD (hidden by default) | **C** measured contact checks (prints to Output) | **Tab** playable.
+Cinematic: see "Controls (cinematic)" in the duel section.
 
-## The 6-second cinematic (frames 0-179 at 30 fps)
-Everything is on one timeline in `BGTimeline.lua`; to move a beat change its frame there and nothing else.
-| Frames | Beat |
-|---|---|
-| 0-14 | Open on movement: wide three-quarter shot, Kael drops into Pursuit and launches by frame 6, camera holds, scarf and dust cross the space |
-| 15-37 | The impossible stop: cut to a side shot; Kael's fist slows and hangs 0.55 studs short of Ren's open palm; two grit pieces stop at the same boundary; Ren looks at the fist, then lifts his eyes |
-| 38-69 | The reversal: Kael drops under, presses his bracer into the field (ripple folds inward), cut tighter; Overdrive burst (one cyan silhouette), follow-up lands on Ren's forearm (contact held frames 56-57); Ren's boot skids half a tile, Kael's landing moves the tiles |
-| 70-106 | Ren takes control: blue point behind Kael, stones roll to it, scarf pulled taut, rear boot slides; left-hand pull gesture, then right-hand push, one red pulse reverses the debris and throws Kael across the floor (same wide shot) |
-| 107-149 | Both go all out: blue and red points merge into a violet core (sound ducks 112-124), Kael plants a foot and bursts across the lane, discharge passes behind his scarf and carves one line through the tiles; one short camera shake at frame 128 |
-| 150-179 | Payoff: Kael on one knee beyond Ren, a loose tile drops between them, Ren's eyes turn first (frames 154-160), then his head; hold |
-Playback uses elapsed time, so it lasts 6.0 s at any frame rate. Shots stay on the +Z side so Kael remains screen-left going into the reversal and screen-right only after he crosses past Ren.
-Physics note: both fighters share one skeleton scale (the pose solver needs it), so Ren reads taller through his hair and collar, not his rig.
+## The Gojo vs Toji duel (teen Gojo, Hidden Inventory look; original choreography, models, animation)
+**Status: written and checked offline only. Nothing here has run in Studio yet. Read "Not verified" below.**
+One timeline, `BGDuel.lua`: 30 fps, frames 0-7199 = the 4:00 duel in 8 chapters, 7200-7799 = the optional 0:20 epilogue. Poses are macros and footwork is generated
+(a footstep every ~0.9 studs, dash trails, plants). Chapters, camera shots, effects, costume states (glasses / spear / chain / tiles), sound cues, the music envelope and
+slow motion are all frame numbers in that file. Every state is a function of the frame, so every chapter starts correctly when selected.
+
+| # | Time | Chapter | Question |
+|---|---|---|---|
+| 1 | 0:00 | Who moved first? | glasses close-up, Toji's reflection, wide (stair / broken pillar / gate), gate-to-pillar burst, both faces in the first 10 s |
+| 2 | 0:20 | Infinity | pebble slows at the cheek; ordinary strike stops a visible gap short (slow motion); feint, then Toji studies him |
+| 3 | 0:50 | Blue | grit, tiles tilt, slab slides; Toji rides it over Gojo to the stair (one continuous shot); fight moves to the walkway |
+| 4 | 1:20 | Toji takes control | curse uncoils, spear, Fly Heads, Gojo's POV, wide reveal, the Infinity fold, Gojo down (stylised) |
+| 5 | 1:55 | Awakening | music drops; hand on a tile, breathing, uncovered eyes; footstep behind Toji; Gojo discovered standing |
+| 6 | 2:20 | Red | opening angle repeated; red core repels Toji; fast exchange, Gojo evades with tiny movements |
+| 7 | 2:55 | Toji's full arsenal | chain of a thousand miles: sweep, return, airborne crossing |
+| 8 | 3:35 | Hollow Purple | blue + red converge, violet core, wide release with the pillar, cleared lane, glasses settle on a broken step |
+| 9 | 4:00 | Years later - Unlimited Void (epilogue) | adult outfit, blindfold, one eye revealed, abstract field, suspended dummy |
+
+**Characters (`BGBuilder.server.lua`)** Gojo ("Blue" rig): tall slender, layered irregular white hair clumps with grey roots and gaps over the forehead, small round dark glasses (removable: a loose prop takes over when they leave his face),
+pale brows, bright blue irises, dark high-collar uniform; the adult outfit and blindfold are hidden parts used in the epilogue. His eyes find Toji before his head turns (`D.eyes`).
+Toji ("Purple" rig): broad shoulders, tapered waist, bare strong forearms, straight black hair over the forehead, narrow green eyes, scar at the right corner of the mouth, fitted black short-sleeve shirt, loose pale trousers gathered at the ankles, dark shoes, no glow.
+The inventory curse is a muted purple band around his torso plus a head (eyes, teeth) and a tail on cloth chains that lag the body. Spear and chain are parts the timeline shows and hides.
+Both rigs share one skeleton scale (the solver needs it), so "tall" and "broad" come from the clothing and hair volume. No custom mesh or texture was used: the places a mesh or texture would raise the likeness most are Gojo's hair silhouette (a sculpted mesh), the uniform collar, and Toji's face and shirt texture.
+
+**Controls (cinematic)** `1-9` jump to a chapter | `[` `]` previous / next | `R` full replay | `Space` pause | `, .` step a frame | `B` slow motion | `V` effects | `F` fixed wide camera | `N` neutral light | `H` HUD and panel (hidden by default) | `C` measured checks | `P` character preview | `Tab` playable.
+**Character preview (`P`)**: neutral flat light, both characters standing side by side; `Left`/`Right` cycles front Gojo, profile Gojo, front Toji, profile Toji, the fight camera at medium distance, a Gojo close-up and a Toji close-up; `G` toggles the glasses; `N` neutral / dusk.
+Slow motion is automatic only on the first Infinity stop (frames 906-960) and the beat before Purple (6860-6900). Playback uses elapsed time; the first full playthrough prints its measured real running time.
+
+**Checked offline on the mock rig (`python3 verify/run.py`)**: 7800 frames = 260.0 s (240.0 duel + 20.0 epilogue); Infinity stop leaves a 0.5-stud gap; spear contact hand miss 0.000; limbs reach their targets (worst per chapter 0.00-0.59 studs, the 0.59 is the leap in chapter 3);
+no foot sinks more than 0.31 studs (worst on Gojo's seated pose), no more than 21 frames per chapter with a wrist inside a torso (chapters 2 and 7), joint-speed peaks of 105-123 degrees per frame in the fastest strikes.
+**Not verified (needs Studio):** every visual: both faces and the scar / glasses at medium distance, hair profiles, front / profile / fight-camera stills, whether the effects read, the camera cuts, the audio (built-in `rbxasset://sounds` files, unconfirmed), real running time, floor and hair exposure, the chapter-start states on the real rig, the contact checks (`C`), and the Gojo POV shot.
+Chapters 4-7 are blocked in at a first-pass level (the choreography keys are sparse: long holds and few intermediate poses), so expect to polish timing and add keys. Capture was not available to me.
 
 ## Lighting and the "white head / white floor" audit
-`BGLook.audit()` runs when the cinematic starts and prints bloom, exposure, colour correction, large Neon parts, reflective parts, Highlights and lights (look for `[LOOK]` lines).
-I could not see your screenshot, so the likely causes were treated together: the old build had Bloom Threshold 0.9 with a Neon moon and Neon rings, `ExposureCompensation 0.45`, a `Reflectance 0.3` floor and Neon hair accents. Now: bloom only above 1.9, exposure 0, no reflectance, every skin / hair / cloth / stone part matte (Fabric, Slate, Concrete, SmoothPlastic), glow only on small effect parts, a soft camera-following fill light, and a separate soft light on Ren's face. Press **N** for fully neutral light and **V** for effects off.
+`BGLook.audit()` runs when the player starts and prints bloom, exposure, colour correction, large Neon parts, reflective parts, Highlights and lights (`[LOOK]` lines). Dusk look: bloom only above threshold 2.0 (white hair keeps detail),
+exposure 0, no reflectance, matte stone (mid-grey, never white) and clothing, glow only on small effect parts. `N` gives flat neutral light with all post effects off.
 
 ## Visual style (reference: anime-cinematic VFX reel)
 Blue and violet stay the only colours on a high-contrast, desaturated, dark glossy arena with a dark vignette and drifting motes.
