@@ -4733,7 +4733,7 @@ local function uvK(f)             -- 0 = courtyard, 1 = inside the domain
 	if f < u.closeStart or f > u.restored then return 0 end
 	if f < u.closeEnd then return (f - u.closeStart) / (u.closeEnd - u.closeStart) end
 	if f < u.release then return 1 end
-	return math.max(0, 1 - (f - u.release) / 20)
+	return math.max(0, 1 - (f - u.release) / 60)       -- the courtyard re-forms gradually, not in one frame
 end
 local function envHide(f)         -- how far the courtyard has dissolved (domain interior, 0.2 s application, Shibuya water)
 	local k = uvK(f)
@@ -4748,12 +4748,16 @@ local construct = Instance.new("Model"); construct.Name = "CurseConstruct"; cons
 local cParts = {}
 do
 	local function cp(size, off, color, shape) local q = mk(shape, size, color, Enum.Material.SmoothPlastic, 1); q.Parent = construct; table.insert(cParts, { part = q, off = off }) return q end
-	local body, skin = Color3.fromRGB(96, 80, 108), Color3.fromRGB(128, 110, 140)
+	local body, skin = Color3.fromRGB(46, 36, 60), Color3.fromRGB(66, 52, 82)       -- dark, so it reads against both the courtyard and the black void
 	cp(Vector3.new(2.6, 3.2, 1.8), CFrame.new(0, 3.0, 0), body)
 	cp(Vector3.new(1.9, 1.6, 1.6), CFrame.new(0, 5.2, -0.2), skin)
-	cp(Vector3.new(0.5, 0.3, 0.1), CFrame.new(-0.4, 5.3, -1.05), Color3.fromRGB(240, 236, 220))
-	cp(Vector3.new(0.5, 0.3, 0.1), CFrame.new(0.4, 5.3, -1.05), Color3.fromRGB(240, 236, 220))
-	cp(Vector3.new(1.2, 0.3, 0.1), CFrame.new(0, 4.8, -1.05), Color3.fromRGB(50, 24, 44))
+	for _, ex in ipairs({ -0.4, 0.4 }) do                                                -- glowing eyes and a lit mouth: small neon parts only
+		local e = cp(Vector3.new(0.5, 0.3, 0.1), CFrame.new(ex, 5.3, -1.05), Color3.fromRGB(215, 140, 255)); e.Material = Enum.Material.Neon
+	end
+	local mo = cp(Vector3.new(1.2, 0.3, 0.1), CFrame.new(0, 4.8, -1.05), Color3.fromRGB(160, 70, 190)); mo.Material = Enum.Material.Neon
+	for _, r in ipairs({ { Vector3.new(2.7, 0.12, 1.9), CFrame.new(0, 4.5, 0) }, { Vector3.new(2.7, 0.12, 1.9), CFrame.new(0, 2.0, 0) } }) do      -- thin rim bands so the silhouette stays readable
+		local b = cp(r[1], r[2], Color3.fromRGB(150, 110, 220)); b.Material = Enum.Material.Neon
+	end
 	cp(Vector3.new(0.9, 3.4, 0.9), CFrame.new(-1.9, 3.2, -0.3), skin)      -- arms
 	cp(Vector3.new(0.9, 3.4, 0.9), CFrame.new(1.9, 3.2, -0.3), skin)
 	cp(Vector3.new(1.0, 2.4, 1.0), CFrame.new(-0.7, 1.2, 0), body)
