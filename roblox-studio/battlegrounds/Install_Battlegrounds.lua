@@ -2367,7 +2367,8 @@ function Look.apply(mode)
 		Lighting.Ambient = Color3.fromRGB(120, 120, 128)
 		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 136)
 		Lighting.GlobalShadows = true
-		for _, e in ipairs({ bloom, cc, dof, atmo }) do if e then e.Enabled = false end end
+		for _, e in ipairs({ bloom, cc, dof }) do if e then e.Enabled = false end end
+		if atmo then atmo.Density = 0 end      -- Atmosphere has no Enabled property: zero density turns the haze off
 	else
 		Lighting.ClockTime = 0
 		Lighting.Brightness = 1.3
@@ -2377,7 +2378,7 @@ function Look.apply(mode)
 		if bloom then bloom.Enabled = true; bloom.Intensity = 0.25; bloom.Size = 12; bloom.Threshold = 1.9 end   -- only tiny, very bright effect geometry blooms
 		if cc then cc.Enabled = true; cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(235, 238, 255) end
 		if dof then dof.Enabled = false end
-		if atmo then atmo.Enabled = true; atmo.Density = 0.18; atmo.Offset = 0.1; atmo.Color = Color3.fromRGB(95, 105, 160); atmo.Decay = Color3.fromRGB(40, 45, 90); atmo.Haze = 0; atmo.Glare = 0 end
+		if atmo then atmo.Density = 0.18; atmo.Offset = 0.1; atmo.Color = Color3.fromRGB(95, 105, 160); atmo.Decay = Color3.fromRGB(40, 45, 90); atmo.Haze = 0; atmo.Glare = 0 end
 	end
 end
 
@@ -2403,7 +2404,8 @@ function Look.audit()
 	for _, c in ipairs(Lighting:GetChildren()) do
 		if c:IsA("BloomEffect") then print(string.format("[LOOK]   Bloom enabled=%s intensity %.2f threshold %.2f size %d", tostring(c.Enabled), c.Intensity, c.Threshold, c.Size))
 		elseif c:IsA("ColorCorrectionEffect") then print(string.format("[LOOK]   ColorCorrection enabled=%s brightness %.2f contrast %.2f saturation %.2f", tostring(c.Enabled), c.Brightness, c.Contrast, c.Saturation))
-		elseif c:IsA("SunRaysEffect") or c:IsA("BlurEffect") or c:IsA("DepthOfFieldEffect") or c:IsA("Atmosphere") then print("[LOOK]   " .. c.ClassName .. " enabled=" .. tostring(c.Enabled or c:IsA("Atmosphere"))) end
+		elseif c:IsA("Atmosphere") then print(string.format("[LOOK]   Atmosphere density %.2f", c.Density))
+		elseif c:IsA("SunRaysEffect") or c:IsA("BlurEffect") or c:IsA("DepthOfFieldEffect") then print("[LOOK]   " .. c.ClassName .. " enabled=" .. tostring(c.Enabled)) end
 	end
 	local neon, reflect, hl, lights, bright = 0, 0, 0, 0, {}
 	for _, d in ipairs(Workspace:GetDescendants()) do
