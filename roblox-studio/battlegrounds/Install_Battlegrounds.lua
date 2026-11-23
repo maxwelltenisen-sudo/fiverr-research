@@ -4788,8 +4788,14 @@ end
 -- the domain: far luminous centre + layered streams that keep accumulating
 local centerBall = mk(Enum.PartType.Ball, Vector3.new(10, 10, 10), Color3.fromRGB(255, 255, 255), Enum.Material.Neon, 1)
 local centerLight = Instance.new("PointLight"); centerLight.Range, centerLight.Brightness, centerLight.Color, centerLight.Shadows = 60, 3, Color3.fromRGB(210, 225, 255), false; centerLight.Parent = centerBall
-local halos = {}
-for i = 1, 3 do halos[i] = mk(Enum.PartType.Cylinder, Vector3.new(0.2, 18 + i * 10, 18 + i * 10), (i == 2) and Color3.fromRGB(190, 110, 255) or Color3.fromRGB(110, 170, 255), Enum.Material.Neon, 1) end
+local halos = {}      -- thin luminous rings (48 short Neon segments each), not solid discs
+for i = 1, 3 do
+	local r = 12 + 8 * i
+	local col = (i == 2) and Color3.fromRGB(190, 110, 255) or Color3.fromRGB(110, 170, 255)
+	local segs = {}
+	for k = 1, 48 do segs[k] = mk(nil, Vector3.new(0.35, 2 * math.pi * r / 48 * 1.15, 0.35), col, Enum.Material.Neon, 1) end
+	halos[i] = { r = r, segs = segs }
+end
 local streams = {}
 for i = 1, 420 do
 	local layer = (i % 3) + 1
@@ -4798,6 +4804,7 @@ for i = 1, 420 do
 		x = rng:NextNumber(-34, 34), y = rng:NextNumber(-4, 18), z0 = rng:NextNumber(-60, 12), speed = (4 - layer) * 4 + rng:NextNumber(2, 7), born = rng:NextInteger(0, 330) }
 end
 local domeShell = mk(Enum.PartType.Ball, Vector3.new(36, 36, 36), Color3.fromRGB(70, 80, 120), Enum.Material.SmoothPlastic, 1)
+local atmoBase = {}
 local function updateDomain(f)
 	local k = envHide(f)
 	-- courtyard dissolves; light falls with it
@@ -4811,6 +4818,19 @@ local function updateDomain(f)
 		Lighting.Ambient = DUSK.amb:Lerp(Color3.fromRGB(8, 8, 14), dark)
 		Lighting.OutdoorAmbient = DUSK.out:Lerp(Color3.fromRGB(8, 8, 14), dark)
 		Lighting.Brightness = DUSK.bright * (1 - 0.85 * dark)
+		-- the void is black: night sky and no haze (the place's own Atmospheres are scaled down too)
+		Lighting.ClockTime = 17.6 * (1 - dark)
+		for _, a in ipairs(Lighting:GetChildren()) do
+			if a:IsA("Atmosphere") then
+				if atmoBase[a] == nil then atmoBase[a] = a.Density end
+				a.Density = atmoBase[a] * (1 - dark)
+			end
+		end
+		local bp = Workspace:FindFirstChild("Baseplate")             -- the place's grid floor dissolves with the courtyard
+		if bp then
+			bp.Transparency = dark
+			for _, t in ipairs(bp:GetChildren()) do if t:IsA("Texture") or t:IsA("Decal") then t.Transparency = dark end end
+		end
 	end
 	local u = D.fx.uv
 	-- barrier: the shell closes in a wide shot (visible from outside only)
@@ -4825,9 +4845,16 @@ local function updateDomain(f)
 	centerBall.Transparency = inside and 0.05 or 1
 	centerBall.Position = Vector3.new(8, 4, -46)
 	centerBall.Size = Vector3.new(10 + math.sin(f * 0.12) * 1.5, 10 + math.sin(f * 0.12) * 1.5, 10 + math.sin(f * 0.12) * 1.5)
+	local haloOn = inside and f >= u.closeEnd or (f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames)      -- only once the camera is inside the domain
 	for i, h in ipairs(halos) do
-		h.Transparency = inside and 0.45 or 1
-		h.CFrame = CFrame.new(centerBall.Position) * CFrame.Angles(f * 0.01 * i, f * 0.007 * (4 - i), math.rad(90))
+		local base = CFrame.new(centerBall.Position) * CFrame.Angles(f * 0.01 * i, f * 0.007 * (4 - i), 0)
+		for k, sgm in ipairs(h.segs) do
+			sgm.Transparency = haloOn and 0.15 or 1
+			if haloOn then
+				local a = (k - 1) / 48 * 2 * math.pi
+				sgm.CFrame = base * CFrame.new(h.r * math.cos(a), h.r * math.sin(a), 0) * CFrame.Angles(0, 0, a)
+			end
+		end
 	end
 	local grow = clamp01(((f >= D.fx.uv02.f and f < D.fx.uv02.f + D.fx.uv02.frames) and 330 or (f - u.inside0)) / 330)
 	local nShow = math.floor(60 + 360 * grow)                       -- information keeps accumulating while the opponent is stalled
@@ -4976,9 +5003,9 @@ for _, s in ipairs(D.sound) do table.insert(events, s) end
 local function bigRing(pos, color, d, dur) Style.ringSlash(pos, color, d, 90, dur, 0); Style.ringSlash(pos, Color3.new(1, 1, 1), d * 0.7, 90, dur * 0.8, 0) end
 local function addFn(f, fn) table.insert(events, { f = f, fn = fn }) end
 addFn(8620, function() if state.fx then Style.flash(Color3.fromRGB(180, 210, 255), 0.25, 0.5); bigRing(Vector3.new(7, 0.2, 0), Color3.fromRGB(120, 170, 255), 60, 0.7) end end)          -- the barrier starts to close
-addFn(8700, function() if state.fx then Style.ink(0.6); Style.speedLines(Color3.fromRGB(190, 220, 255), 0.5, 34); Style.flash(Color3.new(1, 1, 1), 0.2, 0.8) end end)                       -- the camera goes inside
+addFn(8700, function() if state.fx then Style.ink(0.6); Style.speedLines(Color3.fromRGB(190, 220, 255), 0.5, 34); Style.flash(Color3.new(1, 1, 1), 0.45, 0.9) end end)                       -- the camera goes inside
 addFn(9050, function() if state.fx then
-	Style.ink(0.7); Style.flash(Color3.new(1, 1, 1), 0.35, 0.9); Style.speedLines(Color3.fromRGB(190, 160, 255), 0.5, 36)
+	Style.ink(0.7); Style.flash(Color3.new(1, 1, 1), 0.8, 1.0); Style.speedLines(Color3.fromRGB(190, 160, 255), 0.7, 36)
 	bigRing(Vector3.new(7, 0.2, 0), Color3.fromRGB(190, 150, 255), 90, 0.9); Style.shards(Vector3.new(7, 4, 0), Color3.fromRGB(210, 190, 255), 30, 18); Style.crack(Vector3.new(7, 0, 0), Color3.fromRGB(190, 150, 255), 18, 14)   -- release: shockwave, shards, cracks
 end end)
 addFn(9420, function() if state.fx then Style.flash(Color3.new(1, 1, 1), 0.3, 1.0); Style.speedLines(Color3.new(1, 1, 1), 0.3, 40); bigRing(Vector3.new(8, 0.2, 0), Color3.fromRGB(200, 220, 255), 50, 0.5) end end)   -- the 0.2 s application
