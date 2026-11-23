@@ -4823,7 +4823,7 @@ local function updateDomain(f)
 		Lighting.OutdoorAmbient = DUSK.out:Lerp(Color3.fromRGB(8, 8, 14), dark)
 		Lighting.Brightness = DUSK.bright * (1 - 0.85 * dark)
 		-- the void is black: night sky and no haze (the place's own Atmospheres are scaled down too)
-		Lighting.ClockTime = 17.6 * (1 - dark)
+		Lighting.ClockTime = 17.6 * (1 - dark ^ 0.3)       -- eased: the sky stays dark longer on the way out (and starts dimming earlier on the way in)
 		for _, a in ipairs(Lighting:GetChildren()) do
 			if a:IsA("Atmosphere") then
 				if atmoBase[a] == nil then atmoBase[a] = a.Density end
