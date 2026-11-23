@@ -11,9 +11,9 @@ power forms and ultimates, and an 8-12 s cinematic replay of the fist-to-forearm
 1. Open your place. Stop any running Play session.
 2. **Easiest:** the Roblox Studio connector in your local Claude Code can install it for you. In the repo folder run `claude` and say:
    *"Install roblox-studio/battlegrounds into my open Studio place from the source files (see README), press Play, read the Output and fix errors."*
-   **Or paste:** copy all of `Install_Battlegrounds.lua`, paste it into **View > Command Bar** (or the Output window's command line), press Enter. It prints `created ...` 12 times.
+   **Or paste:** copy all of `Install_Battlegrounds.lua`, paste it into **View > Command Bar** (or the Output window's command line), press Enter. It prints `created ...` 14 times.
    **Or Rojo:** `rojo serve` in this folder (uses `default.project.json`).
-   **Or by hand:** create the 12 scripts in the table below and paste each file.
+   **Or by hand:** create the 14 scripts in the table below and paste each file.
 3. **Test > Play** (not Run). The cinematic replay starts: pass 1 with VFX off, pass 2 with VFX on, then it loops.
 4. Press **Tab** (or the *Playable* button) to fight. The left panel picks the fighter (Kael / Ren), dummy behaviour (Idle / Guard / Attack) and, in Studio only, jumps to Base / First form / Final form.
 
@@ -26,17 +26,36 @@ power forms and ultimates, and an 8-12 s cinematic replay of the fist-to-forearm
 | ReplicatedStorage | ModuleScript | BGCloth | BGCloth.lua (scarf / coat lag) |
 | ReplicatedStorage | ModuleScript | BGRig | BGRig.lua (reads R15 joints) |
 | ReplicatedStorage | ModuleScript | BGStyle | BGStyle.lua (shards, ring slashes, floor cracks, speed lines, flashes, ink frame) |
-| ReplicatedStorage | ModuleScript | BGCinematicData | BGCinematicData.lua (EDITABLE cinematic keyframes, contacts, cameras, markers) |
+| ReplicatedStorage | ModuleScript | BGTimeline | BGTimeline.lua (**THE 6-second cinematic: poses, contacts, camera cuts, debris, effects, shake, sound cues, all by frame**) |
+| ReplicatedStorage | ModuleScript | BGLook | BGLook.lua (night / neutral lighting presets + the light audit) |
+| ReplicatedStorage | ModuleScript | BGCinematicData | BGCinematicData.lua (colour palette only; the old cinematic data is no longer played) |
 | ServerScriptService | Script | BGBuilder | BGBuilder.server.lua (arena + the two rigs and costumes) |
 | ServerScriptService | Script | BGServer | BGServer.server.lua (runs BGCore, validates input) |
 | StarterPlayer > StarterPlayerScripts | LocalScript | BGClient | BGClient.client.lua (playable mode: input, posing, VFX, forms, camera, UI) |
-| StarterPlayer > StarterPlayerScripts | LocalScript | BGDirector | BGDirector.client.lua (cinematic replay) |
+| StarterPlayer > StarterPlayerScripts | LocalScript | BGCine | BGCine.client.lua (plays BGTimeline by elapsed time) |
 
 Older story/showcase Scripts and LocalScripts are disabled by the installer, not deleted.
 
 ## Controls
 Playable: **WASD** move (W = toward the opponent) | **LMB** combo | **Q E R C** skills | **hold F** guard | **G** counter / riposte | **X** first form (50%) | **Z** final form (100%) | **T** ultimate | **Tab** playable <-> cinematic.
-Cinematic: **R** replay | **B** slow motion | **V** VFX on/off | **Space** pause | **, .** step | **C** contact inspector (side camera, then top camera, prints the measured gap). The same buttons are in the left panel.
+Cinematic: **R** replay | **Space** pause | **, .** step one frame | **B** slow motion | **V** effects on/off | **F** fixed wide camera (check the animation alone) | **N** neutral light (all post effects off) | **H** show/hide the control panel and HUD (hidden by default) | **C** measured contact checks (prints to Output) | **Tab** playable.
+
+## The 6-second cinematic (frames 0-179 at 30 fps)
+Everything is on one timeline in `BGTimeline.lua`; to move a beat change its frame there and nothing else.
+| Frames | Beat |
+|---|---|
+| 0-14 | Open on movement: wide three-quarter shot, Kael drops into Pursuit and launches by frame 6, camera holds, scarf and dust cross the space |
+| 15-37 | The impossible stop: cut to a side shot; Kael's fist slows and hangs 0.55 studs short of Ren's open palm; two grit pieces stop at the same boundary; Ren looks at the fist, then lifts his eyes |
+| 38-69 | The reversal: Kael drops under, presses his bracer into the field (ripple folds inward), cut tighter; Overdrive burst (one cyan silhouette), follow-up lands on Ren's forearm (contact held frames 56-57); Ren's boot skids half a tile, Kael's landing moves the tiles |
+| 70-106 | Ren takes control: blue point behind Kael, stones roll to it, scarf pulled taut, rear boot slides; left-hand pull gesture, then right-hand push, one red pulse reverses the debris and throws Kael across the floor (same wide shot) |
+| 107-149 | Both go all out: blue and red points merge into a violet core (sound ducks 112-124), Kael plants a foot and bursts across the lane, discharge passes behind his scarf and carves one line through the tiles; one short camera shake at frame 128 |
+| 150-179 | Payoff: Kael on one knee beyond Ren, a loose tile drops between them, Ren's eyes turn first (frames 154-160), then his head; hold |
+Playback uses elapsed time, so it lasts 6.0 s at any frame rate. Shots stay on the +Z side so Kael remains screen-left going into the reversal and screen-right only after he crosses past Ren.
+Physics note: both fighters share one skeleton scale (the pose solver needs it), so Ren reads taller through his hair and collar, not his rig.
+
+## Lighting and the "white head / white floor" audit
+`BGLook.audit()` runs when the cinematic starts and prints bloom, exposure, colour correction, large Neon parts, reflective parts, Highlights and lights (look for `[LOOK]` lines).
+I could not see your screenshot, so the likely causes were treated together: the old build had Bloom Threshold 0.9 with a Neon moon and Neon rings, `ExposureCompensation 0.45`, a `Reflectance 0.3` floor and Neon hair accents. Now: bloom only above 1.9, exposure 0, no reflectance, every skin / hair / cloth / stone part matte (Fabric, Slate, Concrete, SmoothPlastic), glow only on small effect parts, a soft camera-following fill light, and a separate soft light on Ren's face. Press **N** for fully neutral light and **V** for effects off.
 
 ## Visual style (reference: anime-cinematic VFX reel)
 Blue and violet stay the only colours on a high-contrast, desaturated, dark glossy arena with a dark vignette and drifting motes.

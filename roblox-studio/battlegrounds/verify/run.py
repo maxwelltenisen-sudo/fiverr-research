@@ -2,7 +2,7 @@
 from lupa import LuaRuntime
 import os, sys
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-for f in sys.argv[1:] or ["clips_test.lua", "core_test.lua", "cin_test.lua", "cin_smooth.lua", "cin_scan.lua"]:
+for f in sys.argv[1:] or ["clips_test.lua", "core_test.lua", "tl_test.lua"]:
     if os.path.exists(f):
         print("=====", f)
         LuaRuntime().execute(open(f).read())

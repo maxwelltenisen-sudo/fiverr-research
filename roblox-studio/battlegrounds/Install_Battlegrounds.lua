@@ -1,6 +1,6 @@
 -- ONE-PASTE INSTALLER: Kael vs Ren battlegrounds showcase.
 -- Paste this whole file into Roblox Studio's Command Bar (View > Command Bar) or the Output window's command line, press Enter.
--- Creates 8 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
+-- Creates 10 ModuleScripts (ReplicatedStorage), 2 Scripts (ServerScriptService), 2 LocalScripts (StarterPlayerScripts).
 -- Your older story / showcase scripts are DISABLED, not deleted (re-enable them in Properties if you want them back).
 local RS = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
@@ -343,7 +343,6 @@ function Engine.bake(R, data)
 	for ci, c in ipairs(data.contacts) do
 		local att, def_ = tracks[c.attacker], tracks[c.defender]
 		local ai = findKey(att, c.t)
-		local di = findKey(def_, c.t)
 		local aSide = c.hand == "R" and "Right" or "Left"
 		local Hc
 		local n
@@ -375,6 +374,23 @@ function Engine.bake(R, data)
 				att.anchor.z = att.anchor.z - (S.Z - want.Z)
 			end
 			bakeFeet(att)
+			setHandLocal(att, ai, c.hand, Hc)
+		elseif c.kind == "hover" then
+			-- attacker's fist stops `gap` studs short of the defender's open palm (the impossible stop)
+			bakeFeet(att)
+			local P = Engine.eval(R, def_, c.t)
+			local palm = P.hands[c.dhand].t
+			local k = att.keys[ai]
+			local nn = flat(V3.new(k.px - palm.X, 0, k.pz - palm.Z)).Unit
+			Hc = palm + nn * (c.gap + c.fist)
+			info[ci] = { C = palm, Hc = Hc, n = nn, plane = Hc + nn * c.fist, gap = c.gap, fist = c.fist }
+			setHandLocal(att, ai, c.hand, Hc)
+		elseif c.kind == "point" then
+			-- fist/wrist placed at an offset from an earlier contact's point (e.g. the bracer touching the field)
+			bakeFeet(att)
+			local ref = info[c.ref]
+			Hc = ref.Hc + V3.new(c.dx or 0, c.dy or 0, c.dz or 0)
+			info[ci] = { C = Hc, Hc = Hc, n = ref.n }
 			setHandLocal(att, ai, c.hand, Hc)
 		else
 			-- chest contact: strike the defender's upper torso front
@@ -1684,7 +1700,8 @@ end
 function Cloth:reset() self.prevPos = nil end
 
 -- utCF = world CFrame of the UpperTorso (or LowerTorso for hems); dt = simulated seconds this frame (0 when paused)
-function Cloth:update(utCF, dt)
+-- wind = extra forward-velocity-like push in studs/s (positive streams the cloth backward, e.g. a pull from behind)
+function Cloth:update(utCF, dt, wind)
 	local fwd = utCF:VectorToWorldSpace(Vector3.new(0, 0, -1))
 	local yaw = math.atan2(-fwd.X, -fwd.Z)
 	local pos = utCF.Position
@@ -1698,6 +1715,7 @@ function Cloth:update(utCF, dt)
 		vf = v:Dot(Vector3.new(fwd.X, 0, fwd.Z))
 		vl = v:Dot(Vector3.new(-fwd.Z, 0, fwd.X))
 	end
+	vf = vf + (wind or 0)
 	self.prevPos = pos
 	local now = os.clock()
 	for _, c in pairs(self.chains) do
@@ -2099,6 +2117,311 @@ D.colors = {
 
 return D
 ]====])
+put(RS, "ModuleScript", "BGTimeline", [====[
+-- BGTimeline (ModuleScript, ReplicatedStorage): THE ONE SHARED TIMELINE for the 6-second cinematic.
+-- 30 fps, frames 0-179. Fighter poses, camera cuts, debris, field, power effects, camera shake and sound cues all read from here.
+-- To move a beat, change its frame number in this file only: nothing else holds timing.
+--
+--   T.beats      named sections (HUD / checks use them)
+--   T.fighters   keyframes per rig (Blue = Kael, Purple = Ren), same pose format as BGClips but keyed by frame `f`
+--   T.contacts   places where two bodies must meet (solved by BGEngine.bake)
+--   T.camera     shots: {f, pos, look, fov, roll, cut = true} (cut = jump on that frame, otherwise it blends from the previous key)
+--   T.fx         timed effect events; T.sound = cue list; T.eyes = Ren's eye-look keys
+-- Axes: world +X is screen-right (camera sits on the +Z side). Kael faces +X, Ren faces -X. Hands/feet: f forward, s to the fighter's right, y height.
+local T = {}
+T.fps, T.frames = 30, 180
+T.duration = T.frames / T.fps          -- 6.0 s, played by elapsed time
+function T.t(frame) return frame / T.fps end
+
+T.beats = {
+	{ f = 0,   name = "open" },
+	{ f = 15,  name = "impossible stop" },
+	{ f = 38,  name = "reversal" },
+	{ f = 70,  name = "Ren takes control" },
+	{ f = 107, name = "all out" },
+	{ f = 150, name = "payoff" },
+}
+
+local function H(f, s, y) return { f = f, s = s, y = y } end
+local function F(f, s, lift) return { f = f, s = s, lift = lift or 0 } end
+
+---------------------------------------------------------------------------------------------- fighters
+local KB = {   -- Kael: confident sideways stance, relaxed shoulders, loose hands
+	dx = 0, dz = 0, yaw = 0, pyaw = -34, twist = -10, lean = 4, roll = 0, crouch = 0.2, headYaw = 0, headPitch = 0,
+	rfYaw = -50, lfYaw = -14, rfPitch = 0, lfPitch = 0, rf = F(-0.7, 0.55), lf = F(0.55, -0.4),
+	rh = H(0.25, 0.55, -0.55), lh = H(0.4, -0.5, -0.5), rp = H(0.0, 0.6, -0.9), lp = H(0.0, -0.6, -0.9),
+}
+local RB = {   -- Ren: upright, one hand loose at his side
+	dx = 0, dz = 0, yaw = 0, pyaw = -8, twist = -3, lean = 0, roll = 0, crouch = 0.05, headYaw = 0, headPitch = 0,
+	rfYaw = -12, lfYaw = -6, rfPitch = 0, lfPitch = 0, rf = F(-0.15, 0.55), lf = F(0.15, -0.45),
+	rh = H(0.05, 0.7, -0.95), lh = H(0.15, -0.65, -0.95), rp = H(0.0, 0.5, -0.9), lp = H(0.0, -0.5, -0.9),
+}
+T.bases = { Blue = KB, Purple = RB }
+
+T.fighters = {
+	Blue = {
+		baseYaw = -90, anchor = { x = -12, z = 0 },        -- anchor is re-solved so the follow-up lands on Ren's forearm
+		base = KB,
+		keys = {
+			{ f = 0 },
+			-- 0-14 Pursuit: hips drop, launch by frame 6 (feet are listed on every moving key so they travel with the body)
+			{ f = 3,  ease = "out2", crouch = 0.9, lean = 14, pyaw = -18, twist = -12, headPitch = 6, rh = H(0.1, 0.7, -0.3), lh = H(0.9, -0.4, 0.2) },
+			{ f = 6,  ease = "in2", dx = 0.5, crouch = 0.8, lean = 24, pyaw = -6, twist = 4, lf = F(1.1, -0.35, 0.15), rf = F(-1.3, 0.55, 0.35), rh = H(-0.1, 0.7, -0.3), lh = H(0.7, -0.4, 0.1) },
+			{ f = 10, ease = "linear", dx = 2.6, crouch = 0.45, lean = 28, lf = F(0.2, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8) },
+			{ f = 14, ease = "linear", dx = 5.8, lf = F(0.2, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8) },
+			-- 15-37 the burst, then the fist slows and hangs
+			{ f = 18, ease = "linear", dx = 9.0, crouch = 0.5, lean = 26, lf = F(0.3, -0.35, 0.7), rf = F(-1.5, 0.55, 0.8), rh = H(0.6, 0.7, 0.2) },
+			{ f = 22, ease = "out2", dx = 11.0, crouch = 0.55, lean = 22, pyaw = 10, twist = 14, lf = F(1.4, -0.35, 0.25), rf = F(-1.2, 0.55, 0.5), rh = H(1.5, 0.65, 0.45) },
+			{ f = 27, ease = "out3", dx = 11.9, lf = F(1.3, -0.35, 0), rf = F(-0.75, 0.55, 0), rh = H(1.95, 0.6, 0.5) },
+			{ f = 31, ease = "out2", dx = 12.1, rh = H(2.05, 0.6, 0.5), lh = H(0.9, -0.75, 0.3) },
+			{ f = 34, ease = "linear", dx = 12.15, rh = H(2.05, 0.6, 0.5) },        -- hand baked from the hover contact
+			-- 38-69 the reversal
+			{ f = 38, ease = "in2", crouch = 1.25, lean = 34, pyaw = -6, twist = 2, rh = H(1.6, 0.6, 1.1) },
+			{ f = 42, ease = "out2", crouch = 1.35, lean = 38, rh = H(1.5, 0.6, 0.9) },
+			{ f = 44, ease = "linear", crouch = 1.3, lean = 36, rh = H(1.6, 0.6, 0.3) },       -- baked: bracer touches the field
+			{ f = 46, ease = "in3", dx = 12.35, crouch = 0.75, lean = 30, lf = F(1.5, -0.35, 0), rf = F(-1.0, 0.55, 0.2) },
+			{ f = 48, ease = "linear", dx = 12.55, crouch = 0.4, lean = 28, lf = F(1.1, -0.35, 0.5), rf = F(-1.3, 0.55, 0.7), rh = H(0.7, 0.6, 0.3) },
+			{ f = 51, ease = "out2", dx = 12.7, crouch = -0.2, lean = 24, lf = F(0.7, -0.35, 1.0), rf = F(-1.0, 0.55, 1.1), rh = H(1.0, 0.55, 0.7) },
+			{ f = 54, ease = "in2", dx = 12.78, crouch = -0.3, lean = 20, lf = F(0.8, -0.35, 1.1), rf = F(-0.6, 0.55, 1.2), rh = H(1.6, 0.55, 1.0) },
+			{ f = 56, ease = "in3", dx = 12.8, crouch = 0.0, lean = 18, pyaw = 14, twist = 18, lf = F(1.1, -0.35, 0.8), rf = F(-0.4, 0.55, 0.9), rh = H(2.0, 0.6, 0.9) },   -- CONTACT: hand baked
+			{ f = 57, ease = "linear" },                                                -- contact pose held two frames (56-57)
+			{ f = 60, ease = "out2", dx = 12.5, crouch = 1.2, lean = 22, lf = F(1.2, -0.35, 0), rf = F(-0.7, 0.55, 0), rh = H(1.2, 0.6, 0.6) },   -- hard landing
+			{ f = 66, ease = "inout", dx = 12.3, crouch = 0.8, lean = 10, pyaw = -18, twist = -6, rh = H(0.5, 0.55, 0.0), lh = H(0.5, -0.5, 0.0) },
+			-- 70-106 Ren takes control: the pull from behind, then the push
+			{ f = 70, ease = "inout", dx = 12.2, crouch = 0.6, lean = 14 },
+			{ f = 80, ease = "inout", dx = 12.2, crouch = 0.7, lean = 18, rf = F(-1.5, 0.55, 0), rh = H(0.6, 0.7, 0.2), lh = H(0.7, -0.7, 0.2) },
+			{ f = 88, ease = "inout", dx = 12.2, crouch = 0.75, lean = 20, rf = F(-1.75, 0.55, 0) },
+			{ f = 91, ease = "in2", dx = 12.2, crouch = 0.4, lean = -26, headPitch = -18, rh = H(0.2, 1.1, 0.5), lh = H(0.2, -1.1, 0.5), lf = F(0.9, -0.35, 0.1), rf = F(-1.3, 0.55, 0.2) },
+			{ f = 95, ease = "linear", dx = 9.6, crouch = 0.1, lean = -30, lf = F(1.3, -0.35, 0.25), rf = F(-0.6, 0.55, 0.3) },
+			{ f = 100, ease = "out2", dx = 5.4, crouch = 0.9, lean = -22, lf = F(1.9, -0.35, 0), rf = F(0.7, 0.55, 0), headPitch = -8, lh = H(0.9, -0.95, 0.4), rh = H(0.9, 0.95, 0.4) },
+			{ f = 104, ease = "out2", dx = 3.8, crouch = 1.0, lean = 8, headPitch = 4, lf = F(1.3, -0.35, 0), rf = F(0.0, 0.55, 0), lh = H(0.9, -0.9, 0.2), rh = H(0.9, 0.9, 0.2) },
+			-- 107-149 all out: he plants a foot and bursts across the firing lane
+			{ f = 107, ease = "inout", dx = 3.7, crouch = 1.0, lean = 18, rh = H(0.6, 0.5, 0.0), lh = H(0.7, -0.5, 0.0) },
+			{ f = 118, ease = "inout", dx = 3.8, crouch = 0.95, lean = 22, pyaw = -24, twist = -14, lf = F(1.2, -0.35, 0), rf = F(-1.2, 0.55, 0), rh = H(0.2, 0.7, -0.2) },
+			{ f = 126, ease = "inout", dx = 3.9, crouch = 1.0, lean = 28, pyaw = -28 },
+			{ f = 128, ease = "in3", dx = 4.5, dz = 0.4, crouch = 0.7, lean = 30, lf = F(1.0, -0.35, 0.2), rf = F(-1.4, 0.55, 0.5) },
+			{ f = 132, ease = "linear", dx = 10.7, dz = 2.0, crouch = 0.45, lean = 30, lf = F(0.2, -0.35, 0.8), rf = F(-1.6, 0.55, 0.9), rh = H(-0.1, 0.7, -0.2) },
+			{ f = 137, ease = "linear", dx = 17.2, dz = 2.4, lean = 28, lf = F(0.2, -0.35, 0.8), rf = F(-1.6, 0.55, 0.9) },
+			{ f = 142, ease = "out2", dx = 20.7, dz = 2.4, crouch = 0.8, lean = 24, lf = F(1.3, -0.35, 0.05), rf = F(-0.5, 0.55, 0.05) },
+			-- 150-179 payoff: one knee, head down
+			{ f = 150, ease = "out2", dx = 21.6, crouch = 1.35, lean = 26, headPitch = 22, pyaw = -10, twist = -4, lf = F(1.4, -0.35, 0), rf = F(-0.7, 0.55, 0), rh = H(0.7, 0.5, -1.2), lh = H(0.5, -0.5, -0.8) },
+			{ f = 179, ease = "inout", dx = 21.7, crouch = 1.38, lean = 24, headPitch = 24 },
+		},
+	},
+	Purple = {
+		baseYaw = 90, anchor = { x = 4.6, z = 0 },
+		base = RB,
+		keys = {
+			{ f = 0 },
+			{ f = 8,  ease = "inout", lh = H(0.9, -0.3, -0.2), headPitch = 0 },
+			{ f = 15, ease = "out2", lh = H(1.45, -0.15, 0.5), headPitch = 4 },            -- open palm rises to meet the incoming strike
+			{ f = 24, ease = "linear", headPitch = 7 },                                    -- looks at the fist
+			{ f = 34, ease = "linear", lh = H(1.45, -0.15, 0.5), headPitch = 7 },
+			{ f = 40, ease = "inout", headPitch = -5, headYaw = 0 },                       -- lifts his eyes toward Kael
+			{ f = 46, ease = "out2", lean = -6, dx = 0.1, lh = H(1.25, -0.2, 0.55) },     -- the field folds; he rocks back
+			{ f = 52, ease = "inout", lean = 0, pyaw = -16, twist = -10, lh = H(0.95, -0.4, 1.0), lp = H(0.0, -0.4, -0.9) },
+			{ f = 56, ease = "in2", pyaw = -22, twist = -18, lh = H(0.95, -0.4, 1.25), lp = H(0.0, -0.4, -0.9), rh = H(0.3, 0.7, -0.4) },   -- CONTACT: forearm raised, coat twists
+			{ f = 57, ease = "linear" },
+			{ f = 61, ease = "out2", dx = 1.1, pyaw = -34, twist = -26, lean = -8, rf = F(0.2, 0.55, 0), lf = F(0.9, -0.45, 0) },    -- boot skids half a tile
+			{ f = 67, ease = "out2", dx = 2.0, pyaw = -12, twist = -6, lean = 0, rf = F(0.4, 0.55, 0), lf = F(0.8, -0.45, 0), lh = H(1.2, -0.2, 0.7), rh = H(0.1, 0.7, -0.9) },
+			-- 70-106: pull (left hand draws in), then push (right hand thrusts out)
+			{ f = 72, ease = "out2", dx = 2.0, lh = H(1.5, -0.15, 0.6), headPitch = 0 },
+			{ f = 82, ease = "inout", lh = H(0.4, -0.3, 0.35), twist = -2 },
+			{ f = 87, ease = "inout", lh = H(0.2, -0.5, -0.4), rh = H(0.4, 0.6, 0.5), twist = -16, pyaw = -20 },
+			{ f = 91, ease = "in3", pyaw = 14, twist = 12, rh = H(1.9, 0.3, 0.75), rp = H(0.4, 0.8, 0.0), lf = F(0.35, -0.5, 0), rf = F(-0.3, 0.6, 0), rfYaw = -4, lfYaw = 0 },
+			{ f = 100, ease = "linear", rh = H(1.9, 0.3, 0.75) },
+			{ f = 107, ease = "inout", lf = F(0.15, -0.45), rf = F(-0.15, 0.55), rfYaw = -12, lfYaw = -6, pyaw = -8, twist = -3, rh = H(0.1, 0.7, -0.9), lh = H(0.15, -0.65, -0.95), rp = H(0.0, 0.5, -0.9) },
+			-- 107-149: nearly motionless; the two points are brought together in front of him
+			{ f = 112, ease = "inout", lh = H(1.0, -0.95, 0.6), rh = H(1.0, 0.95, 0.6), lp = H(0.0, -0.6, -0.5), rp = H(0.0, 0.6, -0.5) },
+			{ f = 121, ease = "inout", lh = H(1.5, -0.3, 0.7), rh = H(1.5, 0.3, 0.7) },
+			{ f = 128, ease = "in3", lean = -3, lh = H(1.75, -0.12, 0.72), rh = H(1.75, 0.12, 0.72) },
+			{ f = 149, ease = "linear" },
+			{ f = 156, ease = "inout", lean = 0, lh = H(0.5, -0.5, -0.5), rh = H(0.3, 0.6, -0.8) },
+			{ f = 164, ease = "inout", lf = F(0.15, -0.45), rf = F(-0.15, 0.55) },
+			{ f = 172, ease = "inout", headYaw = 60, twist = 14, pyaw = 4 },
+			{ f = 179, ease = "inout", headYaw = 100, twist = 30, pyaw = 14 },
+		},
+	},
+}
+
+-- Ren's eye-look keys (x, y in head units); eyes move before the head does
+T.eyes = {
+	{ f = 0, x = 0, y = 0 }, { f = 22, x = 0, y = -0.05 }, { f = 36, x = 0, y = 0.05 }, { f = 107, x = 0, y = 0 },
+	{ f = 154, x = 0.07, y = 0 }, { f = 160, x = 0.07, y = 0 }, { f = 176, x = 0, y = 0 },
+}
+
+---------------------------------------------------------------------------------------------- contacts
+T.contacts = {
+	-- Kael's follow-up lands on Ren's raised left forearm
+	{ id = "followup", kind = "guard", f = 56, attacker = "Blue", hand = "R", defender = "Purple", arm = "L", guardRadius = 0.52, fist = 0.3, reach = 0.55 },
+	-- the impossible stop: fist ends `gap` studs short of Ren's palm
+	{ id = "stop", kind = "hover", f = 34, attacker = "Blue", hand = "R", defender = "Purple", dhand = "L", gap = 0.55, fist = 0.3 },
+	-- the bracer is pressed into the field plane
+	{ id = "bracer", kind = "point", f = 44, attacker = "Blue", hand = "R", ref = 2, dx = -0.1, dy = -0.75, dz = 0 },
+}
+
+---------------------------------------------------------------------------------------------- camera
+-- Left-to-right is preserved: every shot is on the +Z side looking toward -Z. Cuts jump on their frame; other keys blend.
+T.camera = {
+	{ f = 0,   name = "A wide 3/4",   pos = { -4.5, 3.4, 13.5 }, look = { -3.5, 3.0, 0 },  fov = 44 },
+	{ f = 14,  name = "A hold",       pos = { -4.5, 3.4, 13.5 }, look = { -3.5, 3.0, 0 },  fov = 44 },
+	{ f = 15,  name = "B stop",       pos = { 2.2, 3.4, 8.2 },  look = { 2.4, 3.3, 0 },   fov = 28, cut = true },
+	{ f = 37,  name = "B push-in",    pos = { 2.4, 3.4, 7.0 },  look = { 2.5, 3.3, 0 },   fov = 28 },
+	{ f = 38,  name = "B2",           pos = { 2.3, 3.0, 6.8 },  look = { 2.5, 3.0, 0 },   fov = 28, cut = true },
+	{ f = 45,  name = "C tight",      pos = { 3.0, 2.9, 5.0 },  look = { 3.1, 2.9, 0 },   fov = 26, cut = true },
+	{ f = 57,  name = "C contact",    pos = { 3.4, 3.0, 5.0 },  look = { 3.5, 3.1, 0 },   fov = 26 },
+	{ f = 58,  name = "C settle",     pos = { 3.8, 3.0, 6.8 },  look = { 4.0, 3.0, 0 },   fov = 30 },
+	{ f = 70,  name = "D wide low",   pos = { -0.5, 2.2, 14.0 }, look = { -0.5, 2.4, 0 },  fov = 50, cut = true },
+	{ f = 106, name = "D hold",       pos = { -0.5, 2.2, 14.0 }, look = { -0.5, 2.4, 0 },  fov = 50 },
+	{ f = 107, name = "E wide side",  pos = { 0.8, 3.2, 16.0 }, look = { 0.8, 2.9, 0 },   fov = 48, cut = true },
+	{ f = 149, name = "E drift",      pos = { 1.2, 3.2, 15.4 }, look = { 1.2, 2.9, 0 },   fov = 47 },
+	{ f = 150, name = "F final",      pos = { 5.8, 2.8, 13.0 }, look = { 6.0, 2.4, 0 },   fov = 44, cut = true },
+	{ f = 179, name = "F hold",       pos = { 6.0, 2.8, 12.6 }, look = { 6.2, 2.4, 0 },   fov = 44 },
+}
+T.shake = { { f = 128, amp = 0.55, frames = 7 } }      -- one brief impulse, only on the strongest discharge
+
+---------------------------------------------------------------------------------------------- effects
+-- Every effect reads these frames; positions that depend on the bodies come from the solved rig at runtime.
+T.fx = {
+	dust      = { { f = 6, who = "Blue", kind = "launch" }, { f = 60, who = "Blue", kind = "land" }, { f = 128, who = "Blue", kind = "launch" }, { f = 142, who = "Blue", kind = "land" } },
+	grit      = { from = 15, release = 38, count = 14, stopped = 2 },        -- suspended at the boundary; two stop exactly at the fist's plane
+	field     = { show = 14, ripple = 18, fold = 44, gone = 52 },            -- boundary disc, contact ripple folds inward at 44-50
+	afterimage = { { f = 46, who = "Blue" } },                               -- the single cyan silhouette left at Overdrive takeoff
+	tiles     = {                                                            -- loose tiles hop where Kael lands / is thrown / where the beam carves
+		{ f = 60, kind = "hop", x = "Blue", radius = 6, h = 0.9 },
+		{ f = 91, kind = "hop", x = "Blue", radius = 5, h = 0.5 },
+		{ f = 100, kind = "skid", x = "Blue", radius = 4, h = 0.25 },
+		{ f = 129, kind = "carve", z = -0.5, x0 = 5.0, x1 = -22.0, speed = 70 },
+		{ f = 142, kind = "hop", x = "Blue", radius = 5, h = 0.6 },
+		{ f = 156, kind = "drop" },                                          -- one loose tile falls between them
+	},
+	stones    = { count = 16, pullFrom = 70, pullTo = 88, push = 91, settle = 106 },   -- roll toward the blue point, then are thrown back
+	bluePoint = { f = 70, hold = 104, form = 112, merge = 121 },
+	redPulse  = { f = 91, dur = 5 },
+	core      = { form = 121, fire = 128, collapse = 149 },                  -- blue + red merge into violet at 121; discharge down the lane at 128
+	beam      = { f = 128, hold = 138, gone = 149, z = -0.5, len = 26 },
+	windKael  = { { from = 70, to = 90, wind = 9 } },                        -- scarf pulled taut toward the blue point
+}
+
+T.sound = {
+	{ f = 5,   cue = "launch" }, { f = 36, cue = "hush" }, { f = 46, cue = "field_break" }, { f = 56, cue = "block_hit" },
+	{ f = 70, cue = "pull" }, { f = 91, cue = "push" }, { f = 112, cue = "duck_start" }, { f = 124, cue = "duck_end" },
+	{ f = 121, cue = "core" }, { f = 128, cue = "discharge" }, { f = 142, cue = "land" }, { f = 156, cue = "tile_drop" },
+}
+-- built-in client sounds; replace with your own rbxassetid:// ids (uploaded under your account) to taste
+T.soundIds = {
+	launch = "rbxasset://sounds/swordlunge.wav", hush = "", field_break = "rbxasset://sounds/impact_water.mp3", block_hit = "rbxasset://sounds/impact_explosion_03.mp3",
+	pull = "rbxasset://sounds/bass.mp3", push = "rbxasset://sounds/swordslash.wav", core = "rbxasset://sounds/electronicpingshort.wav",
+	discharge = "rbxasset://sounds/impact_explosion_03.mp3", land = "rbxasset://sounds/impact_water.mp3", tile_drop = "rbxasset://sounds/snap.mp3",
+}
+
+---------------------------------------------------------------------------------------------- helpers
+local function copy(t) local r = {} for k, v in pairs(t) do r[k] = v end return r end
+-- Engine data: frames become seconds
+function T.engineData()
+	local out = { fighters = {}, contacts = {} }
+	for name, fd in pairs(T.fighters) do
+		local keys = {}
+		for i, k in ipairs(fd.keys) do
+			local nk = copy(k)
+			nk.t, nk.f = k.f / T.fps, nil
+			keys[i] = nk
+		end
+		out.fighters[name] = { baseYaw = fd.baseYaw, anchor = { x = fd.anchor.x, z = fd.anchor.z }, base = fd.base, keys = keys }
+	end
+	for i, c in ipairs(T.contacts) do
+		local nc = copy(c)
+		nc.t, nc.f = c.f / T.fps, nil
+		out.contacts[i] = nc
+	end
+	return out
+end
+
+function T.shotAt(frame)
+	local cur
+	for _, k in ipairs(T.camera) do if k.f <= frame then cur = k end end
+	return cur
+end
+
+return T
+]====])
+put(RS, "ModuleScript", "BGLook", [====[
+-- BGLook (ModuleScript, ReplicatedStorage): lighting presets + an audit that prints what could blow out the picture.
+--   Look.apply("night")    restrained moonlit grade (default for the cinematic)
+--   Look.apply("neutral")  flat, even light with ALL post effects off: use it to judge skin, hair, clothes and stone
+--   Look.audit()           prints exposure, bloom, colour correction, lights, Neon parts, Highlights, reflective parts
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Look = {}
+
+local function effect(class)
+	for _, c in ipairs(Lighting:GetChildren()) do if c:IsA(class) then return c end end
+end
+
+function Look.apply(mode)
+	local bloom, cc, dof, atmo = effect("BloomEffect"), effect("ColorCorrectionEffect"), effect("DepthOfFieldEffect"), effect("Atmosphere")
+	if mode == "neutral" then
+		Lighting.ClockTime = 14
+		Lighting.Brightness = 2
+		Lighting.ExposureCompensation = 0
+		Lighting.Ambient = Color3.fromRGB(120, 120, 128)
+		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 136)
+		Lighting.GlobalShadows = true
+		for _, e in ipairs({ bloom, cc, dof, atmo }) do if e then e.Enabled = false end end
+	else
+		Lighting.ClockTime = 0
+		Lighting.Brightness = 1.3
+		Lighting.ExposureCompensation = 0
+		Lighting.Ambient = Color3.fromRGB(60, 66, 100)
+		Lighting.OutdoorAmbient = Color3.fromRGB(70, 76, 112)
+		if bloom then bloom.Enabled = true; bloom.Intensity = 0.25; bloom.Size = 12; bloom.Threshold = 1.9 end   -- only tiny, very bright effect geometry blooms
+		if cc then cc.Enabled = true; cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(235, 238, 255) end
+		if dof then dof.Enabled = false end
+		if atmo then atmo.Enabled = true; atmo.Density = 0.18; atmo.Offset = 0.1; atmo.Color = Color3.fromRGB(95, 105, 160); atmo.Decay = Color3.fromRGB(40, 45, 90); atmo.Haze = 0; atmo.Glare = 0 end
+	end
+end
+
+-- soft front fill that follows the camera so eyes and brows read at night; no shadows, low brightness
+function Look.fill()
+	local p = Workspace:FindFirstChild("BGFill")
+	if not p then
+		p = Instance.new("Part")
+		p.Name = "BGFill"
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow, p.Transparency = true, false, false, false, false, 1
+		p.Size = Vector3.new(1, 1, 1)
+		local l = Instance.new("PointLight")
+		l.Range, l.Brightness, l.Color, l.Shadows = 30, 0.55, Color3.fromRGB(255, 242, 232), false
+		l.Parent = p
+		p.Parent = Workspace
+	end
+	return p
+end
+
+function Look.audit()
+	print(string.format("[LOOK] Lighting: Brightness %.2f  Exposure %.2f  ClockTime %.1f  Ambient %s  OutdoorAmbient %s",
+		Lighting.Brightness, Lighting.ExposureCompensation, Lighting.ClockTime, tostring(Lighting.Ambient), tostring(Lighting.OutdoorAmbient)))
+	for _, c in ipairs(Lighting:GetChildren()) do
+		if c:IsA("BloomEffect") then print(string.format("[LOOK]   Bloom enabled=%s intensity %.2f threshold %.2f size %d", tostring(c.Enabled), c.Intensity, c.Threshold, c.Size))
+		elseif c:IsA("ColorCorrectionEffect") then print(string.format("[LOOK]   ColorCorrection enabled=%s brightness %.2f contrast %.2f saturation %.2f", tostring(c.Enabled), c.Brightness, c.Contrast, c.Saturation))
+		elseif c:IsA("SunRaysEffect") or c:IsA("BlurEffect") or c:IsA("DepthOfFieldEffect") or c:IsA("Atmosphere") then print("[LOOK]   " .. c.ClassName .. " enabled=" .. tostring(c.Enabled or c:IsA("Atmosphere"))) end
+	end
+	local neon, reflect, hl, lights, bright = 0, 0, 0, 0, {}
+	for _, d in ipairs(Workspace:GetDescendants()) do
+		if d:IsA("BasePart") then
+			if d.Material == Enum.Material.Neon and d.Transparency < 0.9 then
+				neon += 1
+				if d.Size.Magnitude > 6 then table.insert(bright, d:GetFullName() .. " (large Neon, size " .. tostring(d.Size) .. ")") end
+			end
+			if d.Reflectance > 0.05 then reflect += 1; table.insert(bright, d:GetFullName() .. " reflectance " .. d.Reflectance) end
+		elseif d:IsA("Highlight") then hl += 1
+		elseif d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then lights += 1 end
+	end
+	print(string.format("[LOOK] Workspace: %d visible Neon parts, %d reflective parts, %d Highlights, %d lights", neon, reflect, hl, lights))
+	for i = 1, math.min(#bright, 8) do print("[LOOK]   suspect: " .. bright[i]) end
+end
+
+return Look
+]====])
 put(SSS, "Script", "BGBuilder", [====[
 -- BGBuilder (Script, ServerScriptService): builds the moonlit stone arena and the two R15 fighters (Kael = "Blue", Ren = "Purple").
 -- It does not animate or fight: BGServer decides combat, BGClient / BGDirector pose the rigs.
@@ -2163,10 +2486,10 @@ end
 
 ---------------------------------------------------------------- stage: moonlit stone arena
 Lighting.ClockTime = 0
-Lighting.Brightness = 1.7
-Lighting.ExposureCompensation = 0.45
-Lighting.Ambient = Color3.fromRGB(62, 66, 105)
-Lighting.OutdoorAmbient = Color3.fromRGB(78, 82, 125)
+Lighting.Brightness = 1.3
+Lighting.ExposureCompensation = 0
+Lighting.Ambient = Color3.fromRGB(60, 66, 100)
+Lighting.OutdoorAmbient = Color3.fromRGB(70, 76, 112)
 
 local function fx(inst)
 	inst:SetAttribute("ShowcaseFX", true)
@@ -2177,13 +2500,13 @@ local atmo = Instance.new("Atmosphere")
 atmo.Density = 0.28; atmo.Offset = 0.2; atmo.Color = Color3.fromRGB(100, 110, 175); atmo.Decay = Color3.fromRGB(40, 45, 90)
 fx(atmo)
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.9; bloom.Size = 26; bloom.Threshold = 0.9
+bloom.Intensity = 0.25; bloom.Size = 12; bloom.Threshold = 1.9
 fx(bloom)
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.28; cc.Saturation = -0.2; cc.TintColor = Color3.fromRGB(225, 228, 255)   -- high contrast, desaturated world: blue and violet are the only colours
+cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(235, 238, 255)
 fx(cc)
 local dof = Instance.new("DepthOfFieldEffect")
-dof.FarIntensity = 0.12; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28
+dof.FarIntensity = 0.1; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28; dof.Enabled = false
 fx(dof)
 
 local R = Config.arena.radius
@@ -2192,20 +2515,20 @@ part({ Name = "Ground", Size = Vector3.new(500, 1, 500), Position = Vector3.new(
 	Material = Enum.Material.Slate, CanCollide = true })
 -- raised stone disc
 part({ Name = "ArenaFloor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, (R + 3) * 2, (R + 3) * 2),
-	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(30, 32, 44), Material = Enum.Material.Slate, Reflectance = 0.3, CanCollide = true })   -- dark glossy floor
+	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(46, 48, 60), Material = Enum.Material.Slate, Reflectance = 0, CanCollide = true })   -- matte stone
 part({ Size = Vector3.new(0.1, (R + 3.4) * 2, (R + 3.4) * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, -0.02, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE3, Material = Enum.Material.Slate })
 part({ Size = Vector3.new(0.12, R * 2, R * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, 0.0, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE2, Material = Enum.Material.Cobblestone })
--- engraved rings: restrained, so fighters stay the brightest things in the frame
-for _, spec in ipairs({ { R * 2 - 1, 0.5, BLUE }, { R * 1.3, 0.4, VIOLET }, { 7, 0.35, Color3.fromRGB(150, 160, 210) } }) do
+-- engraved rings: painted stone lines (matte), so only effect geometry glows
+for _, spec in ipairs({ { R * 2 - 1, BLUE }, { R * 1.3, VIOLET }, { 7, Color3.fromRGB(150, 160, 210) } }) do
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, spec[1], spec[1]), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = spec[3], Material = Enum.Material.Neon, Transparency = 0.82 })
+		Color = spec[2]:Lerp(STONE2, 0.7), Material = Enum.Material.Concrete })
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, spec[1] - 0.35, spec[1] - 0.35), CFrame = CFrame.new(0, 0.06, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = STONE2, Material = Enum.Material.Cobblestone })
+		Color = STONE2, Material = Enum.Material.Concrete })
 end
 part({ Name = "Moon", Shape = Enum.PartType.Ball, Size = Vector3.new(70, 70, 70), Position = Vector3.new(-70, 140, -260),
-	Color = Color3.fromRGB(225, 232, 255), Material = Enum.Material.Neon, Transparency = 0.05 })
+	Color = Color3.fromRGB(200, 208, 232), Material = Enum.Material.SmoothPlastic, Transparency = 0 })
 
 math.randomseed(7)
 -- broken wall ring and pillars
@@ -2287,7 +2610,7 @@ local function cloth(model, onPart, chain, attach, count, size, color, lining)
 		m:SetAttribute("Depth", i)
 		m.Parent = seg
 		if lining then
-			local l = part({ Size = Vector3.new(size.X * 0.92, size.Y * 0.96, 0.05), Color = lining, Material = Enum.Material.Neon, Transparency = 0.55 }, model)
+			local l = part({ Size = Vector3.new(size.X * 0.92, size.Y * 0.96, 0.05), Color = lining, Material = Enum.Material.Fabric, Transparency = 0 }, model)
 			l:SetAttribute("Lining", true)
 			weld(l, seg, CFrame.new(0, 0, -size.Z / 2 - 0.02))
 		end
@@ -2330,150 +2653,151 @@ local function newRig(name, colors)
 	return m
 end
 
--- Blocky expressive face made of thin parts on the front of the head.
--- cfg: eye = {w,h}, pupil = {w,h}, brow = {w,h,tiltDeg,y}, mouth = {w,tiltDeg,y}, irisColor
+-- Blocky expressive face made of thin parts on the front of the head. Irises and pupils hang off Motor6Ds (EyeJoint) so
+-- the cinematic can move the eyes before the head turns. cfg: eye {w,h}, pupil {w,h}, brow {w,h,tiltDeg,y}, mouth {w,tiltDeg,y}, irisColor, browColor.
+local function movable(model, size, offset, color, tag)
+	local head = model:FindFirstChild("Head")
+	local p = part({ Size = size, Color = color, Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, model)
+	local m = Instance.new("Motor6D")
+	m.Name = "EyeJoint"
+	m.Part0, m.Part1, m.C0 = head, p, offset
+	m:SetAttribute("EyeJoint", true)
+	m.Parent = p
+	if tag then p:SetAttribute(tag, true) end
+	return p
+end
 local function face(model, cfg)
 	local dark = Color3.fromRGB(18, 16, 20)
 	for _, s in ipairs({ -1, 1 }) do
 		local ex = s * 0.29
-		accessory(model, "Head", Vector3.new(cfg.eye[1], cfg.eye[2], 0.04), CFrame.new(ex, 0.08, -0.61), Color3.fromRGB(246, 246, 250), Enum.Material.SmoothPlastic)
-		accessory(model, "Head", Vector3.new(cfg.pupil[1], cfg.pupil[2], 0.05), CFrame.new(ex - s * 0.02, 0.07, -0.625), cfg.irisColor, Enum.Material.SmoothPlastic, "Eye")
-		accessory(model, "Head", Vector3.new(cfg.pupil[1] * 0.45, cfg.pupil[2] * 0.45, 0.055), CFrame.new(ex - s * 0.02, 0.07, -0.63), dark)
-		-- eyebrows tilt toward the nose and down = focused / stern
+		accessory(model, "Head", Vector3.new(cfg.eye[1], cfg.eye[2], 0.04), CFrame.new(ex, 0.08, -0.61), Color3.fromRGB(240, 240, 244), Enum.Material.SmoothPlastic)
+		movable(model, Vector3.new(cfg.pupil[1], cfg.pupil[2], 0.05), CFrame.new(ex - s * 0.02, 0.07, -0.625), cfg.irisColor, "Eye")
+		movable(model, Vector3.new(cfg.pupil[1] * 0.45, cfg.pupil[2] * 0.45, 0.055), CFrame.new(ex - s * 0.02, 0.07, -0.63), dark)
 		accessory(model, "Head", Vector3.new(cfg.brow[1], cfg.brow[2], 0.05),
 			CFrame.new(ex, cfg.brow[4], -0.615) * CFrame.Angles(0, 0, math.rad(-s * cfg.brow[3])), cfg.browColor or dark, Enum.Material.SmoothPlastic, "Brow")
 	end
 	accessory(model, "Head", Vector3.new(cfg.mouth[1], 0.05, 0.04), CFrame.new(0.02, cfg.mouth[3], -0.61) * CFrame.Angles(0, 0, math.rad(cfg.mouth[2])), dark)
 end
 
--- KAEL (Blue): slightly leaner, dark swept-back spiky hair with one blue lock, warm tan face, navy fitted combat jacket with cyan piping,
--- short two-tail scarf, black belt with silver buckle, tapered dark pants, charcoal boots, fingerless gloves, slim right forearm guard.
+local MAT = Enum.Material.Fabric       -- clothing and hair are matte; nothing on a character is Neon except the one cyan seam on Kael
+
+-- KAEL: broad blocky torso (wide shirt, wide shoulders), matte black swept-back hair with a fringe, warm tan face, fitted navy shirt,
+-- short asymmetric scarf, charcoal pants, squared boots. ONE cyan seam on the right sleeve, and a compact angular bracer on the right forearm.
 local function buildKael()
-	local m = newRig("Blue", { skin = Color3.fromRGB(222, 170, 124), torso = Color3.fromRGB(26, 34, 66),
-		arm = Color3.fromRGB(26, 34, 66), leg = Color3.fromRGB(26, 28, 38) })
+	local skin = Color3.fromRGB(214, 160, 116)
+	local m = newRig("Blue", { skin = skin, torso = Color3.fromRGB(28, 36, 68), arm = Color3.fromRGB(28, 36, 68), leg = Color3.fromRGB(48, 50, 58) })
 	m:SetAttribute("Character", "Kael")
-	local navy, deep, black = Color3.fromRGB(26, 34, 66), Color3.fromRGB(18, 22, 44), Color3.fromRGB(14, 14, 18)
-	local char = Color3.fromRGB(50, 52, 62)
-	local hairC = Color3.fromRGB(22, 20, 30)
-	-- hair: cap + swept-back spikes in layers, one blue lock near the fringe
-	accessory(m, "Head", Vector3.new(1.3, 0.5, 1.3), CFrame.new(0, 0.62, 0.02), hairC, nil, "Hair")
-	for i = 1, 7 do
-		local x = (i - 4) * 0.3
-		local h = 1.0 - math.abs(i - 4) * 0.1
-		accessory(m, "Head", Vector3.new(0.34, h, 0.5), CFrame.new(x, 0.78, 0.22) * CFrame.Angles(0.75, 0, -x * 0.5), hairC, nil, "Hair")
+	local navy, deep, char, black = Color3.fromRGB(28, 36, 68), Color3.fromRGB(20, 26, 50), Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 32)
+	local hairC = Color3.fromRGB(20, 18, 24)
+	accessory(m, "Head", Vector3.new(1.3, 0.5, 1.3), CFrame.new(0, 0.62, 0.04), hairC, MAT, "Hair")
+	for i = 1, 6 do          -- swept-back layers
+		local x = (i - 3.5) * 0.32
+		accessory(m, "Head", Vector3.new(0.34, 0.95 - math.abs(i - 3.5) * 0.12, 0.5), CFrame.new(x, 0.74, 0.28) * CFrame.Angles(0.8, 0, -x * 0.5), hairC, MAT, "Hair")
 	end
-	accessory(m, "Head", Vector3.new(0.3, 0.7, 0.45), CFrame.new(-0.6, 0.45, 0.2) * CFrame.Angles(0.5, 0, 0.35), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.3, 0.7, 0.45), CFrame.new(0.6, 0.45, 0.2) * CFrame.Angles(0.5, 0, -0.35), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.2, 0.55, 0.3), CFrame.new(-0.3, 0.7, -0.45) * CFrame.Angles(-0.5, 0, 0.1), BLUE, Enum.Material.SmoothPlastic, "Accent")   -- the blue lock
-	face(m, { eye = { 0.28, 0.2 }, pupil = { 0.16, 0.18 }, brow = { 0.36, 0.08, 16, 0.3 }, mouth = { 0.3, 5, -0.3 }, irisColor = Color3.fromRGB(38, 70, 120) })
-	-- fitted jacket, collar and piping
-	accessory(m, "UpperTorso", Vector3.new(2.05, 1.42, 1.08), CFrame.new(0, -0.05, 0.01), navy, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(2.1, 0.5, 1.1), CFrame.new(0, 0.74, 0), deep, Enum.Material.Fabric)                   -- collar band
-	accessory(m, "UpperTorso", Vector3.new(0.09, 1.3, 0.1), CFrame.new(0, -0.05, -0.58), Color3.fromRGB(170, 175, 195), Enum.Material.Metal)  -- zip
-	accessory(m, "UpperTorso", Vector3.new(2.14, 0.07, 1.14), CFrame.new(0, 0.66, 0), CYAN, Enum.Material.Neon, "Seam")           -- shoulder line piping
-	accessory(m, "UpperTorso", Vector3.new(0.07, 0.9, 0.07), CFrame.new(-0.5, -0.15, -0.58), CYAN, Enum.Material.Neon, "Seam")
-	accessory(m, "UpperTorso", Vector3.new(0.07, 0.9, 0.07), CFrame.new(0.5, -0.15, -0.58), CYAN, Enum.Material.Neon, "Seam")
-	accessory(m, "LowerTorso", Vector3.new(2.05, 0.4, 1.08), CFrame.new(0, 0.1, 0.01), navy, Enum.Material.Fabric)
-	accessory(m, "LowerTorso", Vector3.new(2.06, 0.2, 1.1), CFrame.new(0, -0.06, 0), black, Enum.Material.Leather)                 -- matte belt
-	accessory(m, "LowerTorso", Vector3.new(0.3, 0.2, 0.08), CFrame.new(0, -0.06, -0.57), Color3.fromRGB(205, 208, 220), Enum.Material.Metal) -- silver buckle
+	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(-0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, 0.3), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, -0.3), hairC, MAT, "Hair")
+	-- fringe: three separate locks above the brows, swept to the left
+	accessory(m, "Head", Vector3.new(0.45, 0.2, 0.4), CFrame.new(-0.4, 0.52, -0.5) * CFrame.Angles(-0.25, 0, 0.28), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.4, 0.2, 0.4), CFrame.new(0.02, 0.55, -0.52) * CFrame.Angles(-0.25, 0, 0.12), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.35, 0.18, 0.36), CFrame.new(0.4, 0.52, -0.5) * CFrame.Angles(-0.2, 0, -0.06), hairC, MAT, "Hair")
+	face(m, { eye = { 0.28, 0.2 }, pupil = { 0.15, 0.18 }, brow = { 0.36, 0.08, 14, 0.3 }, mouth = { 0.3, 4, -0.3 }, irisColor = Color3.fromRGB(70, 48, 36) })
+	-- broad torso: wide fitted navy shirt over the torso, broad shoulders
+	accessory(m, "UpperTorso", Vector3.new(2.5, 1.5, 1.12), CFrame.new(0, -0.03, 0.01), navy, MAT)
+	accessory(m, "UpperTorso", Vector3.new(2.62, 0.4, 1.16), CFrame.new(0, 0.62, 0.01), deep, MAT)                         -- shoulder yoke
+	accessory(m, "UpperTorso", Vector3.new(1.0, 0.3, 0.9), CFrame.new(0, 0.88, 0), skin, Enum.Material.SmoothPlastic)      -- neck
+	accessory(m, "LowerTorso", Vector3.new(2.2, 0.42, 1.12), CFrame.new(0, 0.1, 0.01), navy, MAT)
+	accessory(m, "LowerTorso", Vector3.new(2.22, 0.2, 1.14), CFrame.new(0, -0.08, 0), black, Enum.Material.Leather)        -- belt
 	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.12, 0.35, 1.12), CFrame.new(0, 0.48, 0), navy, Enum.Material.Fabric)                          -- angled shoulder
-		accessory(m, n, Vector3.new(1.16, 0.07, 1.16), CFrame.new(0, 0.3, 0), CYAN, Enum.Material.Neon, "Seam")
+		accessory(m, n, Vector3.new(1.3, 1.0, 1.3), CFrame.new(0, 0.12, 0), navy, MAT)                                        -- fitted sleeve
 	end
-	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		accessory(m, n, Vector3.new(1.06, 0.07, 1.06), CFrame.new(0, 0.3, 0), CYAN, Enum.Material.Neon, "Seam")                     -- forearm piping
-		accessory(m, n, Vector3.new(1.06, 0.07, 1.06), CFrame.new(0, -0.3, 0), CYAN, Enum.Material.Neon, "Seam")
-	end
-	local g = accessory(m, "RightLowerArm", Vector3.new(1.14, 0.65, 1.14), CFrame.new(0, -0.02, 0), char, Enum.Material.Metal, "Bracer")   -- slim right forearm guard
-	if g then g.Name = "KaelGuardR" end
-	accessory(m, "RightLowerArm", Vector3.new(1.18, 0.06, 1.18), CFrame.new(0, 0.25, 0), CYAN, Enum.Material.Neon, "Seam")
-	for _, n in ipairs({ "RightHand", "LeftHand" }) do
-		accessory(m, n, Vector3.new(1.02, 0.34, 1.02), CFrame.new(0, 0.12, 0), black, Enum.Material.Leather)                         -- fingerless glove
-	end
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.04, 1.1, 1.04), CFrame.new(0, 0, 0), Color3.fromRGB(28, 30, 40), Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do
-		accessory(m, n, Vector3.new(0.92, 0.95, 0.92), CFrame.new(0, 0.02, 0), Color3.fromRGB(28, 30, 40), Enum.Material.Fabric)      -- tapered
-		accessory(m, n, Vector3.new(1.1, 0.38, 1.1), CFrame.new(0, -0.45, 0), char, Enum.Material.Leather)                           -- boot cuff
-	end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.1, 0.7, 1.25), CFrame.new(0, 0.1, 0), char, Enum.Material.Leather) end
-	-- short scarf: collar wrap + two tails (third segment appears in power forms)
-	accessory(m, "UpperTorso", Vector3.new(1.7, 0.42, 1.25), CFrame.new(0, 0.9, 0.04), Color3.fromRGB(34, 44, 86), Enum.Material.Fabric)
-	local tailC = Color3.fromRGB(34, 44, 86)
-	for k, x in ipairs({ -0.32, 0.32 }) do
-		local last = cloth(m, "UpperTorso", "Scarf" .. k, CFrame.new(x, 0.78, 0.62), 3, Vector3.new(0.5, 0.55, 0.16), tailC)
-		if last then
-			last.Transparency = 1                      -- the long third segment is hidden until Charged Mode
-			last:SetAttribute("PowerSegment", true)
-			local trim = part({ Size = Vector3.new(0.5, 0.07, 0.17), Color = CYAN, Material = Enum.Material.Neon, Anchored = false, Massless = true }, m)
-			trim:SetAttribute("Seam", true)
-			weld(trim, m:FindFirstChild("Scarf" .. k .. 2) or last, CFrame.new(0, -0.27, 0))
-		end
-	end
+	-- the one cyan seam (right sleeve, outer edge) so the viewer can track his lead arm
+	accessory(m, "RightUpperArm", Vector3.new(0.07, 0.95, 0.07), CFrame.new(0.66, 0.12, 0), Color3.fromRGB(70, 215, 255), Enum.Material.Neon, "Seam")
+	-- compact angular bracer: a plate with a forward wedge, matte charcoal
+	local b1 = accessory(m, "RightLowerArm", Vector3.new(1.14, 0.62, 1.14), CFrame.new(0, 0.0, 0), char, Enum.Material.SmoothPlastic, "Bracer")
+	if b1 then b1.Name = "KaelBracer" end
+	accessory(m, "RightLowerArm", Vector3.new(0.5, 0.5, 0.42), CFrame.new(0, -0.02, -0.62) * CFrame.Angles(0.5, 0, 0), black, Enum.Material.SmoothPlastic, "Bracer")
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.06, 1.12, 1.06), CFrame.new(0, 0, 0), char, MAT) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(1.0, 1.0, 1.0), CFrame.new(0, 0.05, 0), char, MAT) end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.18, 0.78, 1.36), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather) end   -- squared boots
+	-- short asymmetric scarf: collar wrap + one long tail (3 segments) and one short tail (2 segments)
+	accessory(m, "UpperTorso", Vector3.new(1.7, 0.4, 1.25), CFrame.new(0, 0.95, 0.04), Color3.fromRGB(40, 50, 90), MAT)
+	local scarfC = Color3.fromRGB(40, 50, 90)
+	local longTail = cloth(m, "UpperTorso", "Scarf1", CFrame.new(-0.3, 0.86, 0.62), 3, Vector3.new(0.5, 0.55, 0.16), scarfC)
+	if longTail then longTail:SetAttribute("PowerSegment", true) end
+	cloth(m, "UpperTorso", "Scarf2", CFrame.new(0.34, 0.86, 0.62), 2, Vector3.new(0.5, 0.5, 0.16), scarfC)
 	addTrail(m, "RightHand", BLUE); addTrail(m, "LeftHand", BLUE)
 	return m
 end
 
--- REN (Purple): broader shoulders, lower and heavier, silver-lavender side-swept hair, stern square face,
--- black high-collar coat with a split hem and violet lining, charcoal pants, heavy square boots, reinforced bracers, angular back emblem.
+-- REN: slightly taller, lean silhouette (tall hair clumps and a narrower torso), silver hair in distinct clumps with grey shadows,
+-- visible brows and eyes, dark high collar below the mouth, charcoal split jacket, narrow violet cuffs. His face has its own light.
 local function buildRen()
-	local m = newRig("Purple", { skin = Color3.fromRGB(236, 200, 172), torso = Color3.fromRGB(16, 16, 22),
-		arm = Color3.fromRGB(20, 20, 28), leg = Color3.fromRGB(44, 46, 56) })
+	local skin = Color3.fromRGB(236, 204, 178)
+	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(48, 50, 58), arm = Color3.fromRGB(48, 50, 58), leg = Color3.fromRGB(40, 42, 50) })
 	m:SetAttribute("Character", "Ren")
-	local black, coat, char = Color3.fromRGB(14, 14, 20), Color3.fromRGB(18, 18, 26), Color3.fromRGB(46, 48, 58)
-	local hairC = Color3.fromRGB(190, 184, 220)
-	-- hair: cap + a long slab swept to one side so the brows stay visible
-	accessory(m, "Head", Vector3.new(1.32, 0.5, 1.32), CFrame.new(0, 0.63, 0.02), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(1.0, 0.34, 1.0), CFrame.new(0.22, 0.88, -0.05) * CFrame.Angles(0, 0, -0.28), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.7, 0.3, 0.9), CFrame.new(0.62, 0.74, 0.0) * CFrame.Angles(0, 0, -0.5), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.5, 0.28, 0.5), CFrame.new(0.85, 0.52, -0.05) * CFrame.Angles(0, 0, -0.9), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.9, 0.18, 0.4), CFrame.new(0.2, 0.52, -0.45) * CFrame.Angles(-0.2, 0, -0.18), hairC, nil, "Hair")   -- fringe above the brows
-	accessory(m, "Head", Vector3.new(0.35, 0.6, 0.5), CFrame.new(-0.58, 0.3, 0.2), hairC, nil, "Hair")
-	face(m, { eye = { 0.3, 0.15 }, pupil = { 0.16, 0.14 }, brow = { 0.42, 0.1, 12, 0.28 }, mouth = { 0.32, 0, -0.3 }, irisColor = Color3.fromRGB(88, 70, 120), browColor = Color3.fromRGB(26, 22, 32) })
-	-- high-collar coat
-	accessory(m, "UpperTorso", Vector3.new(2.38, 1.5, 1.16), CFrame.new(0, -0.04, 0.01), coat, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(2.2, 0.8, 1.32), CFrame.new(0, 0.86, 0.02), black, Enum.Material.Fabric)                -- high collar
-	accessory(m, "UpperTorso", Vector3.new(0.12, 0.7, 1.34), CFrame.new(0, 0.86, 0), VIOLET, Enum.Material.Neon, "Seam", { Transparency = 1 })
-	accessory(m, "UpperTorso", Vector3.new(0.08, 1.35, 0.08), CFrame.new(0, -0.05, -0.6), Color3.fromRGB(60, 60, 78), Enum.Material.Metal)
-	accessory(m, "LowerTorso", Vector3.new(2.2, 0.42, 1.12), CFrame.new(0, 0.1, 0.01), coat, Enum.Material.Fabric)
-	accessory(m, "LowerTorso", Vector3.new(2.22, 0.2, 1.14), CFrame.new(0, -0.06, 0), black, Enum.Material.Leather)
-	-- angular emblem on the back: two nested chevron bars
-	for i, w in ipairs({ 1.0, 0.62 }) do
-		accessory(m, "UpperTorso", Vector3.new(w, 0.12, 0.05), CFrame.new(-w * 0.2, 0.25 - i * 0.32, 0.6) * CFrame.Angles(0, 0, 0.5), VIOLET, Enum.Material.Neon, "Emblem", { Transparency = 0.45 })
-		accessory(m, "UpperTorso", Vector3.new(w, 0.12, 0.05), CFrame.new(w * 0.2, 0.25 - i * 0.32, 0.6) * CFrame.Angles(0, 0, -0.5), VIOLET, Enum.Material.Neon, "Emblem", { Transparency = 0.45 })
+	local coat, dark, char = Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 34), Color3.fromRGB(40, 42, 50)
+	local silver, shadowGrey = Color3.fromRGB(196, 200, 212), Color3.fromRGB(118, 122, 136)
+	-- hair clumps: each lit clump has a grey shadow clump tucked behind / under it
+	local clumps = {  -- pos, size, rot(x,y,z)
+		{ Vector3.new(0.0, 0.85, -0.2), Vector3.new(0.7, 0.75, 0.6), Vector3.new(-0.3, 0, 0.1) },
+		{ Vector3.new(-0.42, 0.9, 0.0), Vector3.new(0.5, 0.95, 0.55), Vector3.new(0, 0, 0.35) },
+		{ Vector3.new(0.42, 0.95, 0.0), Vector3.new(0.5, 1.05, 0.55), Vector3.new(0, 0, -0.35) },
+		{ Vector3.new(0.0, 1.05, 0.25), Vector3.new(0.6, 0.95, 0.6), Vector3.new(0.5, 0, 0.1) },
+		{ Vector3.new(-0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, 0.5) },
+		{ Vector3.new(0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, -0.5) },
+		{ Vector3.new(0.0, 0.5, 0.5), Vector3.new(1.1, 0.7, 0.4), Vector3.new(0.3, 0, 0) },
+	}
+	accessory(m, "Head", Vector3.new(1.3, 0.45, 1.3), CFrame.new(0, 0.62, 0.04), shadowGrey, MAT, "Hair")
+	for _, c in ipairs(clumps) do
+		accessory(m, "Head", c[2] * 0.95, CFrame.new(c[1] + Vector3.new(0, -0.12, 0.1)) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), shadowGrey, MAT, "Hair")   -- shadow clump
+		accessory(m, "Head", c[2], CFrame.new(c[1]) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), silver, MAT, "Hair")
 	end
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.34, 0.45, 1.34), CFrame.new(0, 0.45, 0), black, Enum.Material.Fabric)                         -- broad shoulder
-		accessory(m, n, Vector3.new(1.18, 0.9, 1.18), CFrame.new(0, -0.1, 0), coat, Enum.Material.Fabric)
-	end
-	-- reinforced bracers: width comes from the cinematic contact data so the clash geometry matches
-	local gw = Data.contacts[1].guardRadius * 2
+	-- fringe clumps above the brows (brows stay visible below them)
+	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(-0.3, 0.5, -0.5) * CFrame.Angles(-0.25, 0, 0.2), silver, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(0.25, 0.52, -0.5) * CFrame.Angles(-0.25, 0, -0.15), silver, MAT, "Hair")
+	face(m, { eye = { 0.3, 0.17 }, pupil = { 0.17, 0.15 }, brow = { 0.42, 0.1, 10, 0.3 }, mouth = { 0.3, 0, -0.3 }, irisColor = Color3.fromRGB(96, 118, 170), browColor = Color3.fromRGB(80, 82, 94) })
+	-- face light independent of any power: small, soft, white, no shadows
+	local head = m:FindFirstChild("Head")
+	local fl = Instance.new("PointLight")
+	fl.Name = "BGFaceLight"
+	fl.Range, fl.Brightness, fl.Color, fl.Shadows = 6, 0.6, Color3.fromRGB(255, 246, 238), false
+	fl.Parent = head
+	-- lean charcoal split jacket with a dark high collar below the mouth
+	accessory(m, "UpperTorso", Vector3.new(2.0, 1.5, 1.08), CFrame.new(0, -0.03, 0.01), coat, MAT)
+	accessory(m, "UpperTorso", Vector3.new(1.66, 0.62, 1.3), CFrame.new(0, 0.72, 0.0), dark, MAT)                           -- collar top sits just under the mouth
+	accessory(m, "UpperTorso", Vector3.new(0.08, 1.35, 0.08), CFrame.new(0, -0.05, -0.58), Color3.fromRGB(70, 72, 86), Enum.Material.SmoothPlastic)
+	accessory(m, "LowerTorso", Vector3.new(2.0, 0.42, 1.08), CFrame.new(0, 0.1, 0.01), coat, MAT)
+	accessory(m, "LowerTorso", Vector3.new(2.02, 0.18, 1.1), CFrame.new(0, -0.08, 0), dark, Enum.Material.Leather)
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.12, 1.0, 1.12), CFrame.new(0, 0.12, 0), coat, MAT) end
+	-- narrow violet cuffs (matte)
 	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		local la = m:FindFirstChild(n)
-		local g = accessory(m, n, Vector3.new(gw, la.Size.Y * 0.85, gw), CFrame.new(0, 0, 0), Color3.fromRGB(24, 24, 32), Enum.Material.Metal, "Bracer")
-		g.Name = (n == "LeftLowerArm") and "GuardL" or "GuardR"
-		for _, y in ipairs({ 0.3, -0.3 }) do
-			accessory(m, n, Vector3.new(gw + 0.04, 0.08, gw + 0.04), CFrame.new(0, la.Size.Y * y, 0), VIOLET, Enum.Material.Neon, "Seam", { Transparency = 1 })
-		end
-		accessory(m, n, Vector3.new(gw + 0.2, 0.5, gw + 0.2), CFrame.new(0, 0, 0), VIOLET, Enum.Material.Neon, "Accent", { Transparency = 1 })   -- translucent layer for Eclipse Form
+		accessory(m, n, Vector3.new(1.06, 0.14, 1.06), CFrame.new(0, -0.38, 0), Color3.fromRGB(140, 96, 220), Enum.Material.SmoothPlastic, "Seam")
 	end
-	for _, n in ipairs({ "RightHand", "LeftHand" }) do accessory(m, n, Vector3.new(1.04, 0.4, 1.04), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather) end
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.16, 1.12, 1.16), CFrame.new(0, 0, 0), char, Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(1.1, 1.0, 1.1), CFrame.new(0, 0.02, 0), char, Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.2, 0.8, 1.38), CFrame.new(0, 0.12, 0), black, Enum.Material.Leather) end   -- heavy square boots
-	-- split hem: two flaps at the back, violet lining shows when they swing
-	for k, x in ipairs({ -0.52, 0.52 }) do
-		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.95, 0.75, 0.14), coat, VIOLET)
-	end
-	-- two long hair tails from the back of the head: cloth chains that swing with the body
-	for k, x in ipairs({ -0.3, 0.3 }) do
-		cloth(m, "Head", "HT" .. k, CFrame.new(x, 0.15, 0.6), 3, Vector3.new(0.42, 1.0, 0.14), hairC)
-	end
-	for _, c in ipairs(m:GetChildren()) do
-		if c:IsA("BasePart") and c.Name:sub(1, 2) == "HT" then c:SetAttribute("Hair", true) end
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.0, 1.12, 1.0), CFrame.new(0, 0, 0), char, MAT) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(0.96, 1.0, 0.96), CFrame.new(0, 0.05, 0), char, MAT) end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.1, 0.74, 1.3), CFrame.new(0, 0.1, 0), dark, Enum.Material.Leather) end
+	-- split jacket flaps behind (violet lining shows when they swing)
+	for k, x in ipairs({ -0.5, 0.5 }) do
+		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.92, 0.8, 0.14), coat, Color3.fromRGB(110, 70, 190))
 	end
 	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
-	addTrail(m, "RightLowerArm", VIOLET); addTrail(m, "LeftLowerArm", VIOLET)
 	return m
+end
+
+
+---------------------------------------------------------------- loose floor tiles (cinematic reacts through them)
+local tiles = Instance.new("Folder")
+tiles.Name = "Tiles"
+tiles.Parent = stage
+math.randomseed(21)
+for ix = -7, 7 do
+	for iz = -1, 1 do
+		local shade = math.random(60, 78)
+		local t = part({ Name = "Tile_" .. ix .. "_" .. iz, Size = Vector3.new(3.84, 0.5, 3.84), CFrame = CFrame.new(ix * 4, 0.02 - 0.25 + 0.02, iz * 4),
+			Color = Color3.fromRGB(shade, shade + 2, shade + 14), Material = Enum.Material.Slate }, tiles)
+		t:SetAttribute("Col", ix)
+		t:SetAttribute("Row", iz)
+	end
 end
 
 local kael = buildKael()
@@ -3355,6 +3679,7 @@ buttonRow({ { "Reset fight", "reset" } }, function() ControlRE:FireServer("reset
 
 local function updatePanelVisibility()
 	local cinematic = not playing()
+	panel.Visible = playing() or stage:GetAttribute("UIVisible") == true      -- hidden during cinematic playback; H shows it
 	for _, c in ipairs(panel:GetChildren()) do
 		if c:IsA("Frame") then
 			local so, co = c:GetAttribute("StudioOnly"), c:GetAttribute("CinematicOnly")
@@ -3425,419 +3750,645 @@ stage:GetAttributeChangedSignal("Mode"):Connect(function()
 end)
 print("[BG] client ready. Tab = playable / cinematic. In Studio: use the left panel to pick the fighter, dummy mode and form.")
 ]====])
-put(SP, "LocalScript", "BGDirector", [====[
--- BGDirector (LocalScript, StarterPlayer > StarterPlayerScripts): the CINEMATIC REPLAY of Kael vs Ren.
--- It only runs while the stage attribute Mode == "Cinematic" (BGClient owns Mode == "Play").
--- Plays the keyframes from ShowcaseData on the two fighters, drives the camera, markers, VFX and checks.
--- Controls:  R replay   V VFX on/off   B slow motion   Space pause   , . step (paused)
---            C contact inspector (freeze at the clash, cycle side / top camera, prints the measured gap)
+put(SP, "LocalScript", "BGCine", [====[
+-- BGCine (LocalScript, StarterPlayer > StarterPlayerScripts): plays the 6-second Kael vs Ren cinematic from BGTimeline.
+-- ONE timeline drives everything: fighter poses, camera cuts, debris, field, power effects, camera shake and sound cues.
+-- Playback uses ELAPSED time (not frame counts), so the scene lasts 6.0 s at any frame rate. It runs only while stage Mode == "Cinematic".
+--
+-- Keys:  R replay   Space pause   , .  step one frame   B slow motion   V effects on/off   F fixed wide camera (for checking animation)
+--        N neutral light (all post effects off)   H show / hide the control panel + HUD   C run the contact checks (prints to Output)   Tab -> playable
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
 local Engine = require(ReplicatedStorage:WaitForChild("BGEngine"))
-local Data = require(ReplicatedStorage:WaitForChild("BGCinematicData"))
+local T = require(ReplicatedStorage:WaitForChild("BGTimeline"))
 local Cloth = require(ReplicatedStorage:WaitForChild("BGCloth"))
+local Rig = require(ReplicatedStorage:WaitForChild("BGRig"))
 local Style = require(ReplicatedStorage:WaitForChild("BGStyle"))
+local Look = require(ReplicatedStorage:WaitForChild("BGLook"))
 
 local stage = Workspace:WaitForChild("Showcase")
 while not stage:GetAttribute("Ready") do task.wait(0.1) end
+local function active() return stage:GetAttribute("Mode") == "Cinematic" end
+
+local BLUE, CYAN, VIOLET, RED = Color3.fromRGB(60, 150, 255), Color3.fromRGB(80, 220, 255), Color3.fromRGB(175, 90, 255), Color3.fromRGB(255, 70, 70)
 local fighters = { Blue = stage:WaitForChild("Blue"), Purple = stage:WaitForChild("Purple") }
-for _, m in pairs(fighters) do
-	m:WaitForChild("HumanoidRootPart"); m:WaitForChild("RightFoot"); m:WaitForChild("UpperTorso"); m:WaitForChild("LowerTorso")
+local motors, cloth, rigs = {}, {}, {}
+local R
+for id, model in pairs(fighters) do
+	Rig.waitReady(model)
+	local defs, sizes, m = Rig.read(model)
+	if not R then R = Engine.newRig(defs, sizes) end
+	motors[id], cloth[id] = m, Cloth.new(model)
+end
+local eyeMotors = {}
+for _, d in ipairs(fighters.Purple:GetDescendants()) do
+	if d:IsA("Motor6D") and d:GetAttribute("EyeJoint") then table.insert(eyeMotors, d) end
 end
 
----------------------------------------------------------------- rig + bake
--- Joints are found by the part they move (Part1), so it works whatever the Motor6D is named.
-local PART1 = { Root = "LowerTorso", Waist = "UpperTorso", Neck = "Head",
-	RightShoulder = "RightUpperArm", RightElbow = "RightLowerArm", RightWrist = "RightHand",
-	LeftShoulder = "LeftUpperArm", LeftElbow = "LeftLowerArm", LeftWrist = "LeftHand",
-	RightHip = "RightUpperLeg", RightKnee = "RightLowerLeg", RightAnkle = "RightFoot",
-	LeftHip = "LeftUpperLeg", LeftKnee = "LeftLowerLeg", LeftAnkle = "LeftFoot" }
-local function findJoint(model, n)
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("Motor6D") and d.Part1 and d.Part1.Name == PART1[n] and d.Part0 and not d:GetAttribute("Chain") then
-			return d
-		end
-	end
-end
-local function readRig(model)
-	local defs = {}
-	for _, n in ipairs(Engine.JOINTS) do
-		local m = findJoint(model, n)
-		local waited = 0
-		while not m and waited < 10 do task.wait(0.1); waited = waited + 0.1; m = findJoint(model, n) end
-		if not m then
-			local names = {}
-			for _, d in ipairs(model:GetDescendants()) do
-				if d:IsA("Motor6D") then table.insert(names, d.Name .. "(" .. d.Parent.Name .. ")") end
-			end
-			warn("BGDirector: joint for " .. n .. " not found on " .. model.Name .. ". Motor6Ds present: " .. table.concat(names, ", "))
-			error("missing joint " .. n)
-		end
-		defs[n] = { c0 = m.C0, c1 = m.C1, motor = m }
-	end
-	return defs, { footY = model.RightFoot.Size.Y, footZ = model.RightFoot.Size.Z }
-end
-local rigDefs, rigSizes = {}, nil
-for name, model in pairs(fighters) do
-	rigDefs[name], rigSizes = readRig(model)
-end
-local R = Engine.newRig(rigDefs.Blue, rigSizes)
-local tracks, info = Engine.bake(R, Data)
-print(string.format("[SHOWCASE] rig: leg %.2f arm %.2f reach %.2f | Blue anchor x=%.2f z=%.2f", R.legLen, R.armLen, R.armReach,
-	tracks.Blue.anchor.x, tracks.Blue.anchor.z))
-
-local motors = {}
-for name, model in pairs(fighters) do
-	motors[name] = {}
-	for _, n in ipairs(Engine.JOINTS) do motors[name][n] = rigDefs[name][n].motor end
-end
-local clothB, clothP = Cloth.new(fighters.Blue), Cloth.new(fighters.Purple)
+local tracks, info = Engine.bake(R, T.engineData())
+local clashC, stopC, bracerC = info[1], info[2], info[3]
+local PLANE_X, PLANE_Y, PLANE_Z = stopC.plane.X, stopC.Hc.Y, stopC.Hc.Z
+print(string.format("[CINE] baked: Kael anchor x=%.2f | field plane x=%.2f y=%.2f | follow-up contact at (%.2f, %.2f, %.2f)", tracks.Blue.anchor.x, PLANE_X, PLANE_Y, clashC.C.X, clashC.C.Y, clashC.C.Z))
 
 ---------------------------------------------------------------- state
-local state = { t = 0, playing = true, speed = 1, vfx = false, pass = 1, inspect = 0, hold = 0, marker = "start", lastT = 0 }
-local PASSES_OFF_FIRST = true
-local results = { footErr = 0, footErrT = 0, minFootY = 1e9, passDone = false }
-local startSnapshot = nil
+local state = { t = 0, playing = true, speed = 1, fx = true, fixed = false, neutral = false, hold = 0, evIdx = 1, lastFrame = -1, loops = 0, wallStart = os.clock() }
+local hudOn = false
+local fxFolder = Workspace:FindFirstChild("BGCineFX")
+if fxFolder then fxFolder:Destroy() end
+fxFolder = Instance.new("Folder"); fxFolder.Name = "BGCineFX"; fxFolder.Parent = Workspace
 
----------------------------------------------------------------- HUD
-local gui = Instance.new("ScreenGui")
-gui.Name = "ShowcaseHUD"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true
-gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-local hud = Instance.new("TextLabel")
-hud.BackgroundColor3 = Color3.fromRGB(10, 10, 18); hud.BackgroundTransparency = 0.35
-hud.Position = UDim2.new(0, 12, 1, -118); hud.Size = UDim2.new(0, 560, 0, 106)
-hud.TextXAlignment = Enum.TextXAlignment.Left; hud.TextYAlignment = Enum.TextYAlignment.Top
-hud.Font = Enum.Font.Code; hud.TextSize = 15; hud.TextColor3 = Color3.fromRGB(235, 235, 255)
-hud.RichText = false
-hud.Parent = gui
-
-local function hudText()
-	local mode = state.inspect > 0 and ("INSPECT " .. (state.inspect == 1 and "A side" or "B top")) or (state.playing and "PLAY" or "PAUSED")
-	hud.Text = string.format(" %s | pass %d | VFX %s | speed %.2fx | t=%.2f / %.1f\n marker: %s\n %s\n R replay  V vfx  B slow-mo  Space pause  , . step  C contact check",
-		mode, state.pass, state.vfx and "ON" or "OFF", state.speed, state.t, Data.duration, state.marker, results.summary or "checks run at the end of pass 1")
-end
-
----------------------------------------------------------------- pose application
+---------------------------------------------------------------- pose
+local snapshot = {}
 local function applyPose(t)
-	local snapshot = {}
-	for name, model in pairs(fighters) do
-		local P = Engine.eval(R, tracks[name], t)
+	for id, model in pairs(fighters) do
+		local P = Engine.eval(R, tracks[id], t)
 		local out = Engine.solve(R, P)
 		model.HumanoidRootPart.CFrame = out.hrp
-		for jn, rt in pairs(out.rot) do motors[name][jn].Transform = rt end
-		snapshot[name] = { P = P, out = out }
-	end
-	return snapshot
-end
-
----------------------------------------------------------------- VFX
-local function burst(pos, color, size, axis)
-	local anchor = Instance.new("Part")
-	anchor.Anchored = true; anchor.CanCollide = false; anchor.Transparency = 1; anchor.Size = Vector3.new(0.2, 0.2, 0.2)
-	anchor.Position = pos; anchor.Parent = Workspace
-	local pe = Instance.new("ParticleEmitter")
-	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	pe.Color = ColorSequence.new(color); pe.LightEmission = 1; pe.Rate = 0
-	pe.Lifetime = NumberRange.new(0.12, 0.26)
-	pe.Speed = NumberRange.new(8 * size, 18 * size)
-	pe.SpreadAngle = Vector2.new(180, 180)
-	pe.Size = NumberSequence.new(0.55 * size, 0)
-	pe.Transparency = NumberSequence.new(0, 1)
-	pe.Parent = anchor
-	pe:Emit(math.floor(22 * size))
-	local ring = Instance.new("Part")
-	ring.Shape = Enum.PartType.Cylinder; ring.Anchored = true; ring.CanCollide = false; ring.CastShadow = false
-	ring.Material = Enum.Material.Neon; ring.Color = color; ring.Transparency = 0.1
-	ring.Size = Vector3.new(0.12, 0.5, 0.5)
-	ring.CFrame = CFrame.lookAt(pos, pos + axis) * CFrame.Angles(0, math.rad(90), 0)
-	ring.Parent = Workspace
-	TweenService:Create(ring, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Size = Vector3.new(0.12, 3.0 * size, 3.0 * size), Transparency = 1 }):Play()
-	Debris:AddItem(anchor, 0.5); Debris:AddItem(ring, 0.3)
-end
-
-local function updateTrails()
-	for _, w in ipairs(Data.vfx.trails) do
-		local p = fighters[w.fighter]:FindFirstChild(w.part)
-		local tr = p and p:FindFirstChild("ShowcaseTrail")
-		if tr then tr.Enabled = state.vfx and state.t >= w.from and state.t <= w.to end
+		for jn, rt in pairs(out.rot) do motors[id][jn].Transform = rt end
+		snapshot[id] = { P = P, out = out }
 	end
 end
 
-local firedThisPass = {}
-local function fireMarkers(prevT, t)
-	for _, mk in ipairs(Data.markers) do
-		if mk.t > prevT and mk.t <= t then
-			state.marker = mk.name
-			if state.vfx then
-				for bi, b in ipairs(Data.vfx.bursts) do
-					if b.marker == mk.name then
-						local c = info[b.contact]
-						burst(c.C, b.color, b.size, c.n or Vector3.new(1, 0, 0))
-						Style.impact(c.C, b.color, b.size >= 1 and 1.5 or 0.7)
+local function lerpKeys(keys, frame, field)
+	local a, b = keys[1], keys[#keys]
+	for i, k in ipairs(keys) do
+		if k.f <= frame then a = k; b = keys[math.min(i + 1, #keys)] end
+	end
+	if b.f == a.f then return a[field] end
+	local u = math.clamp((frame - a.f) / (b.f - a.f), 0, 1)
+	u = u * u * (3 - 2 * u)
+	return a[field] + (b[field] - a[field]) * u
+end
+
+local function windFor(frame)
+	local w = 0
+	for _, e in ipairs(T.fx.windKael) do
+		if frame >= e.from - 3 and frame <= e.to + 3 then
+			local ramp = math.min((frame - (e.from - 3)) / 6, ((e.to + 3) - frame) / 6, 1)
+			w = math.max(w, e.wind * math.clamp(ramp, 0, 1))
+		end
+	end
+	return w
+end
+
+---------------------------------------------------------------- deterministic scene objects (pure functions of the frame, so scrubbing works)
+local rng = Random.new(12)
+local function neon(parent, size, color, transparency, shape)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+	p.Material, p.Color, p.Transparency = Enum.Material.Neon, color, transparency or 0
+	if shape then p.Shape = shape end
+	p.Size = size
+	p.Parent = parent or fxFolder
+	return p
+end
+local function matte(size, color, shape)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, true
+	p.Material, p.Color, p.Size = Enum.Material.Slate, color, size
+	if shape then p.Shape = shape end
+	p.Parent = fxFolder
+	return p
+end
+
+-- the field boundary disc, its ripple ring
+local field = Instance.new("Part")
+field.Anchored, field.CanCollide, field.CanQuery, field.CastShadow = true, false, false, false
+field.Shape, field.Material, field.Color, field.Transparency = Enum.PartType.Cylinder, Enum.Material.ForceField, Color3.fromRGB(190, 200, 255), 1
+field.Size = Vector3.new(0.08, 5.6, 5.6)
+field.CFrame = CFrame.new(PLANE_X, PLANE_Y, PLANE_Z)
+field.Parent = fxFolder
+local ripple = neon(fxFolder, Vector3.new(0.05, 1, 1), Color3.fromRGB(210, 220, 255), 1, Enum.PartType.Cylinder)
+local fold = neon(fxFolder, Vector3.new(0.05, 1, 1), CYAN, 1, Enum.PartType.Cylinder)
+
+-- suspended grit: arrives slowing down, hangs at the boundary, falls when the field folds. Two pieces stop at the fist's plane.
+local grit = {}
+for i = 1, T.fx.grit.count do
+	local special = i <= T.fx.grit.stopped
+	local hover = Vector3.new(PLANE_X - (special and 0.03 or rng:NextNumber(0.1, 1.1)), PLANE_Y + (special and (i == 1 and 0.55 or -0.45) or rng:NextNumber(-1.1, 1.1)), PLANE_Z + (special and 0.1 * i or rng:NextNumber(-1.2, 1.2)))
+	local g = { part = matte(Vector3.new(0.16, 0.12, 0.14) * rng:NextNumber(0.8, 1.4), Color3.fromRGB(150, 150, 160)), hover = hover,
+		start = hover + Vector3.new(-rng:NextNumber(4, 7), rng:NextNumber(-0.8, 1.2), rng:NextNumber(-1.5, 1.5)),
+		arrive = special and 33 + i or rng:NextInteger(27, 34), spin = Vector3.new(rng:NextNumber(-3, 3), rng:NextNumber(-3, 3), rng:NextNumber(-3, 3)),
+		fallDelay = rng:NextNumber(0, 5), drift = Vector3.new(rng:NextNumber(-0.6, 0.2), 0, rng:NextNumber(-0.4, 0.4)) }
+	grit[i] = g
+end
+local function gritCF(g, f)
+	local fromF, fold_ = T.fx.grit.from, T.fx.field.fold
+	if f < fromF then return nil end
+	if f < g.arrive then
+		local u = math.clamp((f - fromF) / (g.arrive - fromF), 0, 1)
+		local e = 1 - (1 - u) ^ 3                       -- decelerates as it nears the palm
+		return CFrame.new(g.start:Lerp(g.hover, e)) * CFrame.Angles(g.spin.X * u, g.spin.Y * u, g.spin.Z * u)
+	elseif f < fold_ + g.fallDelay then
+		local k = (f - g.arrive) / 30
+		return CFrame.new(g.hover + Vector3.new(0, math.sin(k * 3 + g.arrive) * 0.012, 0)) * CFrame.Angles(g.spin.X, g.spin.Y, g.spin.Z)
+	else
+		local k = (f - (fold_ + g.fallDelay)) / 30
+		local y = math.max(g.hover.Y - 0.5 * 24 * k * k, 0.08)
+		return CFrame.new(g.hover.X + g.drift.X * k * 3, y, g.hover.Z + g.drift.Z * k * 3) * CFrame.Angles(g.spin.X + k * 4, g.spin.Y, g.spin.Z + k * 3)
+	end
+end
+
+-- loose stones: roll toward the blue point (pull: curved, accelerating), then are thrown back away from Ren's palm (push: straight, fast)
+local stones = {}
+local function easeIn(u) return u * u end
+local function easeOut(u) return 1 - (1 - u) ^ 3 end
+for i = 1, T.fx.stones.count do
+	stones[i] = { part = matte(Vector3.new(0.34, 0.26, 0.3) * rng:NextNumber(0.8, 1.5), Color3.fromRGB(96, 98, 110)),
+		home = Vector3.new(rng:NextNumber(-7.5, 1.5), 0.15, rng:NextNumber(-3.2, 3.2)), swirl = rng:NextNumber(0.6, 1.4) * (rng:NextNumber() < 0.5 and -1 or 1),
+		throw = Vector3.new(-rng:NextNumber(5, 11), 0, rng:NextNumber(-3, 3)), spin = rng:NextNumber(2, 6) }
+end
+local function bluePos(f)             -- the blue point behind Kael during the pull (frames 70-104)
+	local k = tracks.Blue
+	local P = Engine.eval(R, k, math.min(f, 106) / 30)
+	return Vector3.new(P.rx - 2.4, 2.5, P.rz)
+end
+local function stoneCF(s, f)
+	local st = T.fx.stones
+	if f < st.pullFrom then return CFrame.new(s.home) end
+	local target = bluePos(st.pullTo)
+	if f < st.push then
+		local u = math.clamp((f - st.pullFrom) / (st.pullTo - st.pullFrom), 0, 1)
+		local e = easeIn(u)
+		local flat = Vector3.new(target.X - s.home.X, 0, target.Z - s.home.Z)
+		local perp = Vector3.new(-flat.Z, 0, flat.X).Unit * s.swirl * (1 - e) * u * 2.2   -- curved path toward the point
+		local pos = s.home + flat * e * 0.82 + perp + Vector3.new(0, 0.15 + e * 1.8 * u, 0)
+		return CFrame.new(pos) * CFrame.Angles(u * s.spin, u * 2, 0)
+	end
+	local base = s.home + Vector3.new(target.X - s.home.X, 0, target.Z - s.home.Z) * 0.82 + Vector3.new(0, 1.95, 0)
+	local u = math.clamp((f - st.push) / (st.settle - st.push), 0, 1)
+	local e = easeOut(u)
+	local y = math.max(0.15, 1.95 * (1 - u) ^ 2 + math.sin(u * math.pi) * 0.6)
+	return CFrame.new(base.X + s.throw.X * e, y, base.Z + s.throw.Z * e) * CFrame.Angles(u * s.spin * 3, 0.5, u * 4)
+end
+
+-- tiles
+local tiles = {}
+for _, t in ipairs(stage:WaitForChild("Tiles"):GetChildren()) do
+	table.insert(tiles, { part = t, home = t.CFrame, x = t.Position.X, z = t.Position.Z, jx = rng:NextNumber(-1, 1), jz = rng:NextNumber(-1, 1), col = t:GetAttribute("Col"), row = t:GetAttribute("Row") })
+end
+local DROP_COL = 2
+local function tileCF(t, f)
+	local cf = t.home
+	local y, dz, rx, rz = 0, 0, 0, 0
+	for _, e in ipairs(T.fx.tiles) do
+		if f >= e.f then
+			if e.kind == "hop" or e.kind == "skid" then
+				local cx = snapshot.Blue and snapshot.Blue.P.rx or 0
+				local kp = tracks.Blue.keys
+				local P = Engine.eval(R, tracks.Blue, e.f / 30)
+				cx = P.rx
+				local d = math.abs(t.x - cx)
+				if d <= e.radius and not (e.kind == "hop" and e.f == 142 and t.col == DROP_COL and t.row == 0) then
+					local delay = d / e.radius * 4
+					local u = (f - e.f - delay) / 9
+					if u > 0 then
+						local fall = 1 - d / e.radius
+						if u < 1 then y = y + e.h * fall * math.sin(math.pi * u) end
+						rx = rx + t.jx * 0.05 * fall; rz = rz + t.jz * 0.05 * fall      -- stays slightly tilted after settling
+						if e.kind == "skid" then dz = dz + t.jz * 0.25 * fall * math.min(u, 1) end
 					end
+				end
+			elseif e.kind == "carve" and t.row == 0 then
+				local arrive = e.f + math.abs(e.x0 - t.x) / e.speed * 30
+				local u = (f - arrive) / 8
+				if u > 0 and t.x < e.x0 and t.x > e.x1 then
+					if u < 1 then y = y + 1.1 * math.sin(math.pi * u) end
+					dz = dz + (t.col % 2 == 0 and 0.34 or -0.34) * math.min(u, 1)
+					rz = rz + (t.col % 2 == 0 and 0.12 or -0.12) * math.min(u, 1)
 				end
 			end
 		end
 	end
+	if t.col == DROP_COL and t.row == 0 then       -- the loose tile Kael's landing throws up: it drops between the fighters at ~156
+		local f0, f1 = 142, 158
+		if f >= f0 and f <= f1 then
+			local u = (f - f0) / (f1 - f0)
+			y = y + 4 * 4 * u * (1 - u) * 0.9
+			rx = rx + u * 2.2; rz = rz + u * 1.4
+		elseif f > f1 then
+			local b = (f - f1) / 6
+			if b < 1 then y = y + 0.18 * math.sin(math.pi * b) * (1 - b) end
+			rx, rz = rx + 0.2, rz + 0.08
+		end
+	end
+	return cf * CFrame.new(0, y, dz) * CFrame.Angles(rx, 0, rz)
 end
+
+-- the two points, the core and the discharge
+local blueB = neon(fxFolder, Vector3.new(0.6, 0.6, 0.6), BLUE, 1, Enum.PartType.Ball)
+local redB = neon(fxFolder, Vector3.new(0.6, 0.6, 0.6), RED, 1, Enum.PartType.Ball)
+local coreB = neon(fxFolder, Vector3.new(0.5, 0.5, 0.5), VIOLET, 1, Enum.PartType.Ball)
+local beam = neon(fxFolder, Vector3.new(1, 0.5, 0.5), VIOLET, 1, Enum.PartType.Cylinder)
+local beamCore = neon(fxFolder, Vector3.new(1, 0.2, 0.2), Color3.new(1, 1, 1), 1, Enum.PartType.Cylinder)
+local carveLine = neon(fxFolder, Vector3.new(1, 0.05, 0.3), VIOLET, 1)
+local pulse = neon(fxFolder, Vector3.new(0.08, 1, 1), RED, 1, Enum.PartType.Cylinder)
+local function renPalmWorld(f)
+	local P = Engine.eval(R, tracks.Purple, f / 30)
+	return P.hands.L.t, P
+end
+
+local function updateScene(f)
+	local on = state.fx
+	-- field
+	local F = T.fx.field
+	local vis = on and f >= F.show and f < F.gone
+	local trans = 1
+	if vis then
+		trans = 0.82
+		if f >= F.fold then trans = 0.82 + 0.18 * math.clamp((f - F.fold) / (F.gone - F.fold), 0, 1) end
+		if f < F.show + 3 then trans = 1 - (1 - 0.82) * ((f - F.show) / 3) end
+	end
+	field.Transparency = trans
+	-- boundary ripple: slow thin ring drifting across the disc while it is up; at 44-52 the contact ripple folds inward and flickers cyan
+	local rp = 1
+	if vis and f < F.fold then
+		local ph = ((f - F.show) % 18) / 18
+		local d = 0.8 + 4.8 * ph
+		ripple.Size = Vector3.new(0.04, d, d)
+		ripple.CFrame = CFrame.new(PLANE_X, PLANE_Y, PLANE_Z)
+		rp = 0.55 + 0.45 * ph
+	end
+	ripple.Transparency = (on and vis) and rp or 1
+	local fp = 1
+	if on and f >= F.fold and f < F.gone then
+		local u = (f - F.fold) / (F.gone - F.fold)
+		local d = u < 0.35 and (0.5 + 5.0 * (u / 0.35)) or (5.5 * (1 - (u - 0.35) / 0.65))       -- spreads, then folds inward
+		fold.Size = Vector3.new(0.05, math.max(d, 0.1), math.max(d, 0.1))
+		local bp = bracerC.Hc
+		fold.CFrame = CFrame.new(PLANE_X, bp.Y, bp.Z)
+		fp = 0.1 + 0.8 * u
+	end
+	fold.Transparency = fp
+	-- grit and stones
+	for _, g in ipairs(grit) do
+		local cf = on and gritCF(g, f)
+		g.part.Transparency = cf and 0 or 1
+		if cf then g.part.CFrame = cf end
+	end
+	for _, s in ipairs(stones) do s.part.CFrame = on and stoneCF(s, f) or CFrame.new(s.home) end
+	-- tiles
+	for _, t in ipairs(tiles) do t.part.CFrame = on and tileCF(t, f) or t.home end
+	-- points
+	local BP, CO, BM, RP = T.fx.bluePoint, T.fx.core, T.fx.beam, T.fx.redPulse
+	local bpos, show = bluePos(f), 1
+	if on and f >= BP.f and f <= BP.hold then
+		blueB.Position = bpos
+		local s = 0.7 * math.clamp((f - BP.f) / 5, 0, 1) * (f > BP.hold - 3 and (BP.hold - f) / 3 or 1)
+		blueB.Size = Vector3.new(s, s, s)
+		show = 0
+	elseif on and f > BP.form and f < CO.form then
+		local pc, P = renPalmWorld(CO.form)
+		local ren = P.rx
+		local core = Vector3.new(ren - 1.9, PLANE_Y + 0.35, P.rz + 0.1)
+		local u = math.clamp((f - BP.form) / (CO.form - BP.form), 0, 1)
+		blueB.Position = Vector3.new(ren - 6.5, 3.8, P.rz + 0.3):Lerp(core, easeIn(u) * 0.3 + u * 0.7)
+		blueB.Size = Vector3.new(0.6, 0.6, 0.6)
+		show = 0
+	end
+	blueB.Transparency = show
+	local rshow = 1
+	if on and f > BP.form and f < CO.form then
+		local _, P = renPalmWorld(CO.form)
+		local core = Vector3.new(P.rx - 1.9, PLANE_Y + 0.35, P.rz + 0.1)
+		local start = Vector3.new(P.rx + 2.4, 5.4, P.rz + 0.3)
+		local u = math.clamp((f - BP.form) / (CO.form - BP.form), 0, 1)
+		local arc = Vector3.new(0, math.sin(u * math.pi) * 1.0, 0)
+		redB.Position = start:Lerp(core, easeIn(u) * 0.3 + u * 0.7) + arc
+		redB.Size = Vector3.new(0.6, 0.6, 0.6)
+		rshow = 0
+	end
+	redB.Transparency = rshow
+	-- red pulse: a thin ring leaves Ren's palm toward Kael (a straight push, opposite of the curved pull)
+	local pshow = 1
+	if on and f >= RP.f and f <= RP.f + 6 then
+		local u = (f - RP.f) / 6
+		local pc = renPalmWorld(RP.f)
+		local d = 1.5 + 9 * u
+		pulse.Size = Vector3.new(0.08, d, d)
+		pulse.CFrame = CFrame.new(pc.X - 1.5 - 8 * easeOut(u), pc.Y, pc.Z)
+		pshow = 0.1 + 0.9 * u
+	end
+	pulse.Transparency = pshow
+	-- core and discharge
+	local cshow, bshow, cr = 1, 1, 0
+	local _, PR = renPalmWorld(CO.fire)
+	local corePos = Vector3.new(PR.rx - 1.9, PLANE_Y + 0.35, PR.rz + 0.1)
+	if on and f >= CO.form and f < CO.collapse then
+		cshow = 0
+		local u = math.clamp((f - CO.form) / (CO.fire - CO.form), 0, 1)
+		cr = 0.45 + 0.35 * u
+		if f >= CO.fire then cr = 0.8 * (1 - (f - CO.fire) / (CO.collapse - CO.fire)) + 0.05 end
+		cr = cr * (1 + 0.1 * math.sin(f * 2.1))
+		coreB.Position, coreB.Size = corePos, Vector3.new(cr, cr, cr)
+	end
+	coreB.Transparency = cshow
+	if on and f >= BM.f and f < BM.gone then
+		local grow = math.clamp((f - BM.f) / 3, 0, 1)
+		local len = BM.len * easeOut(grow)
+		local thick = 0.55
+		if f > BM.hold then thick = 0.55 * (1 - (f - BM.hold) / (BM.gone - BM.hold)) end
+		beam.Size = Vector3.new(math.max(len, 0.1), math.max(thick, 0.02), math.max(thick, 0.02))
+		beam.CFrame = CFrame.new(corePos.X - len / 2, corePos.Y, BM.z)
+		beamCore.Size = Vector3.new(math.max(len, 0.1), math.max(thick * 0.35, 0.01), math.max(thick * 0.35, 0.01))
+		beamCore.CFrame = beam.CFrame
+		beam.Transparency, beamCore.Transparency = 0.1, 0
+		-- the single carved line on the floor, following the beam and fading
+		local fade = f > BM.hold and (1 - (f - BM.hold) / (BM.gone - BM.hold)) or 1
+		carveLine.Size = Vector3.new(math.max(len, 0.1), 0.05, 0.3)
+		carveLine.CFrame = CFrame.new(corePos.X - len / 2, 0.1, BM.z)
+		carveLine.Transparency = 0.2 + 0.8 * (1 - fade)
+	else
+		beam.Transparency, beamCore.Transparency, carveLine.Transparency = 1, 1, 1
+	end
+end
+
+---------------------------------------------------------------- one-shot effects (fire when playback crosses their frame)
+local function bodyPos(id, f) local P = Engine.eval(R, tracks[id], f / 30) return Vector3.new(P.rx, 0, P.rz) end
+local function puff(pos, dirX, n)
+	for i = 1, n do
+		local p = Instance.new("Part")
+		p.Anchored, p.CanCollide, p.CanQuery, p.CastShadow = true, false, false, false
+		p.Material, p.Color, p.Transparency = Enum.Material.SmoothPlastic, Color3.fromRGB(120, 120, 130), 0.4
+		local s = rng:NextNumber(0.25, 0.55)
+		p.Shape, p.Size = Enum.PartType.Ball, Vector3.new(s, s, s)
+		p.Position = pos + Vector3.new(rng:NextNumber(-0.3, 0.3), 0.15, rng:NextNumber(-0.4, 0.4))
+		p.Parent = fxFolder
+		local to = p.Position + Vector3.new(dirX * rng:NextNumber(1.5, 3.2), rng:NextNumber(0.2, 0.9), rng:NextNumber(-0.6, 0.6))
+		TweenService:Create(p, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = to, Transparency = 1, Size = Vector3.new(s * 2, s * 2, s * 2) }):Play()
+		Debris:AddItem(p, 0.65)
+	end
+end
+local function ghost(model)
+	local clone = model:Clone()
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored, d.CanCollide, d.CanQuery, d.CastShadow = true, false, false, false
+			d.Material, d.Color, d.Transparency = Enum.Material.ForceField, CYAN, 0.35
+			TweenService:Create(d, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		elseif not d:IsA("Motor6D") and not d:IsA("Attachment") and not d:IsA("WeldConstraint") and not d:IsA("Model") and not d:IsA("Folder") then
+			pcall(function() d:Destroy() end)
+		end
+	end
+	clone.Parent = fxFolder
+	Debris:AddItem(clone, 0.6)
+end
+
+local sounds = {}
+local master = Instance.new("SoundGroup"); master.Name = "BGCineMaster"; master.Volume = 1; master.Parent = SoundService
+local function cue(name)
+	if name == "duck_start" then master.Volume = 0; return end
+	if name == "duck_end" then master.Volume = 1; return end
+	local id = T.soundIds[name]
+	if not id or id == "" then return end
+	local s = Instance.new("Sound")
+	s.SoundId, s.Volume, s.SoundGroup = id, 0.6, master
+	s.Parent = fxFolder
+	pcall(function() s:Play() end)
+	Debris:AddItem(s, 3)
+end
+
+local events = {}
+local function addEvent(f, fn) table.insert(events, { f = f, fn = fn }) end
+for _, e in ipairs(T.fx.dust) do
+	addEvent(e.f, function() if state.fx then puff(bodyPos(e.who, e.f) + Vector3.new(e.kind == "launch" and 0 or 0, 0, 0), -1, e.kind == "land" and 10 or 7); if e.kind == "land" then Style.crack(bodyPos(e.who, e.f), Color3.fromRGB(120, 120, 130), 8, 3) end end end)
+end
+for _, e in ipairs(T.fx.afterimage) do addEvent(e.f, function() if state.fx then ghost(fighters[e.who]) end end) end
+addEvent(T.fx.field.fold + 2, function() if state.fx then Style.shards(Vector3.new(PLANE_X, bracerC.Hc.Y, bracerC.Hc.Z), CYAN, 12, 9) end end)   -- the bracer disrupts the field
+addEvent(T.contacts[1].f, function() if state.fx then Style.impact(clashC.C, Color3.new(1, 1, 1), 1.0); Style.flash(Color3.new(1, 1, 1), 0.06, 0.3) end end)
+addEvent(T.fx.redPulse.f, function() if state.fx then Style.flash(RED, 0.08, 0.2) end end)
+addEvent(T.fx.core.fire, function() if state.fx then Style.flash(VIOLET, 0.1, 0.35) end end)
+addEvent(T.fx.core.form, function() if state.fx then Style.ringSlash(Vector3.new(0, 0, 0) + Vector3.new(bodyPos("Purple", 121).X - 1.9, PLANE_Y + 0.35, 0.1), VIOLET, 3, 90, 0.3, 0) end end)
+for _, s in ipairs(T.sound) do addEvent(s.f, function() cue(s.cue) end) end
+table.sort(events, function(a, b) return a.f < b.f end)
 
 ---------------------------------------------------------------- camera
 local cam = Workspace.CurrentCamera
-local camCF, camFov = nil, 36
-local function resolveShot(shot)
-	local pos, look
-	if shot.rel then
-		local base = info[1].C
-		pos, look = base + shot.off, base
+local fill = Look.fill()
+local function camAt(frame)
+	local keys = T.camera
+	local a, b = keys[1], nil
+	for i, k in ipairs(keys) do if k.f <= frame then a = k; b = keys[i + 1] end end
+	local function v(t) return Vector3.new(t[1], t[2], t[3]) end
+	if b and not b.cut and b.f > a.f then
+		local u = math.clamp((frame - a.f) / (b.f - a.f), 0, 1)
+		u = u * u * (3 - 2 * u)
+		return v(a.pos):Lerp(v(b.pos), u), v(a.look):Lerp(v(b.look), u), a.fov + (b.fov - a.fov) * u, a.name
+	end
+	return v(a.pos), v(a.look), a.fov, a.name
+end
+local function shakeAt(frame)
+	for _, s in ipairs(T.shake) do
+		if frame >= s.f and frame < s.f + s.frames then
+			local k = 1 - (frame - s.f) / s.frames
+			return Vector3.new(math.sin(frame * 91) * s.amp * k, math.cos(frame * 77) * s.amp * k * 0.7, 0)
+		end
+	end
+	return Vector3.zero
+end
+
+---------------------------------------------------------------- HUD (hidden unless H)
+local gui = Instance.new("ScreenGui")
+gui.Name = "BGCineHUD"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true
+gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local hud = Instance.new("TextLabel")
+hud.BackgroundColor3 = Color3.fromRGB(10, 10, 18); hud.BackgroundTransparency = 0.35
+hud.Position = UDim2.new(0, 12, 1, -92); hud.Size = UDim2.new(0, 640, 0, 80)
+hud.TextXAlignment, hud.TextYAlignment = Enum.TextXAlignment.Left, Enum.TextYAlignment.Top
+hud.Font, hud.TextSize, hud.TextColor3, hud.Visible = Enum.Font.Code, 14, Color3.fromRGB(235, 235, 255), false
+hud.Parent = gui
+
+---------------------------------------------------------------- checks (key C): measured on the real parts
+local function snapTo(frame)
+	state.playing = false
+	state.t = frame / T.fps
+	for _ = 1, 3 do RunService.RenderStepped:Wait() end
+end
+local function runChecks()
+	local keepFx, keepPlay, keepT = state.fx, state.playing, state.t
+	state.fx = false
+	snapTo(T.contacts[2].f)
+	local kr, rl = fighters.Blue.RightHand, fighters.Purple.LeftHand
+	local d = (kr.Position - rl.Position)
+	local flat = Vector3.new(d.X, 0, d.Z).Magnitude
+	print(string.format("[CINE CHECK] stopped fist (f%d): fist centre to palm centre = %.2f studs (solver %.2f). Visible strip between fist surface and palm ~ %.2f studs (target %.2f)",
+		T.contacts[2].f, d.Magnitude, stopC.gap + stopC.fist, d.Magnitude - 0.3, stopC.gap))
+	snapTo(T.contacts[3].f)
+	local br = fighters.Blue:FindFirstChild("KaelBracer")
+	if br then
+		local front = br.Position.X + br.Size.X / 2
+		print(string.format("[CINE CHECK] bracer vs field (f%d): bracer centre x=%.2f, front face x=%.2f, field plane x=%.2f -> offset %.2f studs",
+			T.contacts[3].f, br.Position.X, front, PLANE_X, PLANE_X - front))
 	else
-		pos, look = shot.pos, shot.look
+		print("[CINE CHECK] KaelBracer part not found")
 	end
-	return CFrame.lookAt(pos, look) * CFrame.Angles(0, 0, math.rad(shot.roll or 0)), shot.fov
-end
-local function cameraTarget(t)
-	if state.inspect == 1 then return resolveShot(Data.verifyCameras.A) end
-	if state.inspect == 2 then return resolveShot(Data.verifyCameras.B) end
-	local shot = Data.cameras[1]
-	for _, c in ipairs(Data.cameras) do if c.t <= t then shot = c end end
-	return resolveShot(shot)
-end
-
----------------------------------------------------------------- measurements (read the real parts, not the solver)
-local function actualGap(snap)
-	local blue, purple = fighters.Blue, fighters.Purple
-	local c = Data.contacts[1]
-	local aSide = c.hand == "R" and "Right" or "Left"
-	local dSide = c.arm == "R" and "Right" or "Left"
-	local hand = blue[aSide .. "Hand"].Position
-	local ua, la = purple[dSide .. "UpperArm"], purple[dSide .. "LowerArm"]
-	local E = (ua.CFrame * motors.Purple[dSide .. "Elbow"].C0).Position
-	local W = (la.CFrame * motors.Purple[dSide .. "Wrist"].C0).Position
-	local dist, nearest = Engine.segmentDistance(hand, E, W)
-	return dist - c.guardRadius - c.fist, hand, nearest, c
-end
-
-local function reactionCheck()
-	-- both fighters must be moving differently on the contact frame: compare poses just before and after
-	local d0, d1 = 0.04, 0.04
-	local result = {}
-	for name in pairs(fighters) do
-		local a = Engine.eval(R, tracks[name], Data.contacts[1].t - d0)
-		local b = Engine.eval(R, tracks[name], Data.contacts[1].t)
-		local c = Engine.eval(R, tracks[name], Data.contacts[1].t + d1)
-		local v1 = math.abs(b.rx - a.rx) + math.abs(b.lean - a.lean) / 20 + math.abs(b.twist - a.twist) / 20
-		local v2 = math.abs(c.rx - b.rx) + math.abs(c.lean - b.lean) / 20 + math.abs(c.twist - b.twist) / 20
-		result[name] = string.format("%s before %.3f -> after %.3f", name, v1, v2)
-	end
-	return result
-end
-
-local function inspectContact()
-	-- freeze at the clash and measure from both verification cameras
-	state.playing = false; state.t = Data.contacts[1].t; state.inspect = 1; state.vfx = false
-	applyPose(state.t)
-	RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
-	local gap, hand, nearest, c = actualGap()
-	print(string.format("[SHOWCASE CHECK] contact gap (fist surface to forearm surface) = %.3f studs (0 = touching, negative = overlap)", gap))
-	for _, which in ipairs({ "A", "B" }) do
-		state.inspect = (which == "A") and 1 or 2
-		cam.CameraType = Enum.CameraType.Scriptable
-		local cf, fov = cameraTarget(state.t)
-		cam.CFrame = cf; cam.FieldOfView = fov; camCF = cf; camFov = fov
-		RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
-		local surface = nearest + (hand - nearest).Unit * c.guardRadius
-		local pHand = cam:WorldToViewportPoint(hand)
-		local pSurf = cam:WorldToViewportPoint(surface)
-		local pEdge = cam:WorldToViewportPoint(hand + cam.CFrame.RightVector * c.fist)
-		local px = Vector2.new(pHand.X - pSurf.X, pHand.Y - pSurf.Y).Magnitude
-		local rpx = Vector2.new(pHand.X - pEdge.X, pHand.Y - pEdge.Y).Magnitude
-		print(string.format("[SHOWCASE CHECK] camera %s: hand centre to forearm surface = %.1f px, fist radius = %.1f px -> %s",
-			which, px, rpx, math.abs(px - rpx) <= math.max(4, rpx * 0.25) and "fist meets forearm" or "CHECK: visible gap/overlap"))
-	end
-	for line, text in pairs(reactionCheck()) do print("[SHOWCASE CHECK] reaction on contact frame, " .. text) end
-	state.inspect = 1
-end
-
----------------------------------------------------------------- per-frame loop
-local function passStartSnapshot(snap)
-	startSnapshot = {}
-	for name, s in pairs(snap) do
-		startSnapshot[name] = { hrp = s.out.hrp, hands = { s.P.hands.R.t, s.P.hands.L.t }, feet = { s.P.feet.R.g, s.P.feet.L.g } }
-	end
-end
-
-local function endOfPassChecks(snap)
-	local errPos, errHand = 0, 0
-	if startSnapshot then
-		for name, s in pairs(snap) do
-			local st = startSnapshot[name]
-			errPos = math.max(errPos, (s.out.hrp.Position - st.hrp.Position).Magnitude)
-			errHand = math.max(errHand, (s.P.hands.R.t - st.hands[1]).Magnitude, (s.P.hands.L.t - st.hands[2]).Magnitude)
-		end
-	end
-	results.summary = string.format("checks: clash gap %.3f | counter miss %.3f | foot slide max %.3f (t=%.2f) | lowest foot %.3f | return-to-guard %.3f / %.3f",
-		results.contactGap or 0, results.counterMiss or 0, results.footErr, results.footErrT, results.minFootY, errPos, errHand)
-	print("[SHOWCASE CHECK] " .. results.summary)
-	print("[SHOWCASE CHECK] foot error = distance between each planted foot's toe and its locked plant point (0 = no sliding)")
-end
-
-local toeHistory = { Blue = { R = {}, L = {} }, Purple = { R = {}, L = {} } }
-local function measureFeet(snap, t)
-	for name, sn in pairs(snap) do
-		local model = fighters[name]
-		for _, side in ipairs({ "R", "L" }) do
-			local foot = model[(side == "R" and "Right" or "Left") .. "Foot"]
-			local g = sn.P.feet[side].g
-			local toe = foot.CFrame:PointToWorldSpace(Vector3.new(0, -R.footY / 2, -R.footZ / 2))
-			local heel = foot.CFrame:PointToWorldSpace(Vector3.new(0, -R.footY / 2, R.footZ / 2))
-			results.minFootY = math.min(results.minFootY, toe.Y, heel.Y)
-			local hist = toeHistory[name][side]
-			if g.Y < 0.001 then
-				local yaw = math.rad(sn.P.feet[side].yaw)
-				local fwd = Vector3.new(-math.sin(yaw), 0, -math.cos(yaw))
-				table.insert(hist, 1, g + fwd * (R.footZ / 2))
-				if #hist > 3 then table.remove(hist) end
-				-- the parts lag the pose by a frame or two; planted points are constant, so take the closest of the last 3
-				local best = math.huge
-				for _, ex in ipairs(hist) do best = math.min(best, (toe - ex).Magnitude) end
-				if #hist >= 3 and best > results.footErr then results.footErr = best; results.footErrT = t end
-			else
-				table.clear(hist)
+	snapTo(T.contacts[1].f)
+	local pur = fighters.Purple
+	local E = (pur.LeftUpperArm.CFrame * motors.Purple.LeftElbow.C0).Position
+	local W = (pur.LeftLowerArm.CFrame * motors.Purple.LeftWrist.C0).Position
+	local dist = Engine.segmentDistance(fighters.Blue.RightHand.Position, E, W)
+	print(string.format("[CINE CHECK] follow-up (f%d): fist-to-forearm gap = %.3f studs (0 = touching, negative = overlap)", T.contacts[1].f, dist - T.contacts[1].guardRadius - T.contacts[1].fist))
+	-- feet: lowest sole point over the whole timeline
+	local lowest, worstAt = 9, 0
+	for f = 0, T.frames - 1, 2 do
+		snapTo(f)
+		for _, id in ipairs({ "Blue", "Purple" }) do
+			for _, n in ipairs({ "RightFoot", "LeftFoot" }) do
+				local part = fighters[id][n]
+				local y = part.Position.Y - part.Size.Y / 2
+				if y < lowest then lowest, worstAt = y, f end
 			end
 		end
 	end
+	print(string.format("[CINE CHECK] lowest foot sole over 6 s = %.3f studs (f%d); negative = sinking into the floor", lowest, worstAt))
+	state.fx, state.t, state.playing = keepFx, keepT, keepPlay
 end
 
-local lastPassTime = os.clock()
-local pendingMeasure = nil
-local function cinematicOn() return stage:GetAttribute("Mode") == "Cinematic" end
-RunService:BindToRenderStep("ShowcasePose", Enum.RenderPriority.Camera.Value - 1, function(dt)
-	hud.Visible = cinematicOn()
-	if not cinematicOn() then return end
-	local dtSim = 0
-	if state.playing and state.inspect == 0 then
+---------------------------------------------------------------- loop
+local keepSet = { [field] = true, [ripple] = true, [fold] = true, [blueB] = true, [redB] = true, [coreB] = true, [beam] = true, [beamCore] = true, [carveLine] = true, [pulse] = true }
+for _, g in ipairs(grit) do keepSet[g.part] = true end
+for _, st in ipairs(stones) do keepSet[st.part] = true end
+local function resetPlayback()
+	state.t, state.hold, state.evIdx, state.lastFrame, state.wallStart = 0, 0, 1, -1, os.clock()
+	master.Volume = 1
+	for _, c in ipairs(fxFolder:GetChildren()) do          -- remove transient one-shots (puffs, ghosts, sounds); keep the scene objects
+		if not keepSet[c] then c:Destroy() end
+	end
+	for _, id in ipairs({ "Blue", "Purple" }) do cloth[id]:reset() end
+end
+local function hideScene()
+	local keep = state.fx
+	state.fx = false
+	updateScene(0)
+	state.fx = keep
+end
+
+local function cleanup()
+	-- remove anything left over from playable mode that would wash out the picture or crowd the shot
+	for _, name in ipairs({ "BGEffects", "BGStyleFX" }) do
+		local f = Workspace:FindFirstChild(name)
+		if f then for _, c in ipairs(f:GetChildren()) do c:Destroy() end end
+	end
+	for _, model in pairs(fighters) do
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("Highlight") or (d:IsA("ParticleEmitter") and (d.Name == "BGAura" or d.Name == "BGSpark")) or (d:IsA("PointLight") and d.Name == "BGGlow") then d:Destroy()
+			elseif d:IsA("Trail") then d.Enabled = false end
+		end
+	end
+end
+
+local function fireEvents(frame)
+	if frame < state.lastFrame then state.evIdx = 1 end        -- scrubbed backwards
+	while state.evIdx <= #events and events[state.evIdx].f <= frame do
+		if events[state.evIdx].f > state.lastFrame then pcall(events[state.evIdx].fn) end
+		state.evIdx += 1
+	end
+	state.lastFrame = frame
+end
+
+local wasActive = false
+RunService:BindToRenderStep("BGCinePose", Enum.RenderPriority.Camera.Value - 1, function(dt)
+	if not active() then
+		hud.Visible = false
+		if wasActive then hideScene() end
+		wasActive = false
+		return
+	end
+	if not wasActive then
+		wasActive = true
+		cleanup()
+		Style.setEnabled(state.fx)
+		Look.apply(state.neutral and "neutral" or "night")
+		Look.audit()
+		resetPlayback()
+	end
+	if state.playing then
 		if state.hold > 0 then
-			state.hold = state.hold - dt
+			state.hold -= dt
+			if state.hold <= 0 then resetPlayback() end
 		else
-			dtSim = math.min(dt, 1 / 20) * state.speed    -- clamp so a hitch can't skip the animation
-			local prev = state.t
-			state.t = state.t + dtSim
-			if state.t >= Data.duration then
-				state.t = Data.duration
-			end
-			fireMarkers(prev, state.t)
+			state.t = math.min(state.t + dt * state.speed, T.duration)       -- real elapsed time, not frame counts
 		end
 	end
-	-- the parts only show a pose one frame after it is applied, so measure the previous frame's pose against them
-	if pendingMeasure then measureFeet(pendingMeasure.snap, pendingMeasure.t); pendingMeasure = nil end
-	Style.setEnabled(state.vfx)
-	local snap = applyPose(state.t)
-	if state.t == 0 and not startSnapshot then passStartSnapshot(snap) end
-	clothB:update(snap.Blue.out.cf.UpperTorso, dtSim)
-	clothP:update(snap.Purple.out.cf.LowerTorso, dtSim)
-	updateTrails()
-	if state.playing and state.inspect == 0 and state.pass == 1 then pendingMeasure = { snap = snap, t = state.t } end
-	if state.t >= Data.duration and state.hold <= 0 and state.playing and state.inspect == 0 then
-		if state.pass == 1 and not results.passDone then
-			results.passDone = true
-			endOfPassChecks(snap)
-		end
-		-- next pass: pass 1 is VFX off, every later pass VFX on
-		if state.pass == 1 then state.vfx = true end
-		state.pass = state.pass + 1
-		state.t = 0; state.hold = 0.8; state.marker = "start"
-		clothB:reset(); clothP:reset()
+	local frame = state.t * T.fps
+	applyPose(state.t)
+	local f = math.floor(frame)
+	fireEvents(frame)
+	-- eyes, cloth
+	local ex, ey = lerpKeys(T.eyes, frame, "x"), lerpKeys(T.eyes, frame, "y")
+	for _, m in ipairs(eyeMotors) do m.Transform = CFrame.new(ex, ey, 0) end
+	cloth.Blue:update(snapshot.Blue.out.cf.UpperTorso, state.playing and dt * state.speed or 0, windFor(frame))
+	cloth.Purple:update(snapshot.Purple.out.cf.LowerTorso, state.playing and dt * state.speed or 0, 0)
+	updateScene(frame)
+	-- trails off in the cinematic (clean silhouettes)
+	Style.enabled = state.fx
+	if state.playing and state.t >= T.duration and state.hold <= 0 then
+		state.loops += 1
+		if state.loops == 1 then print(string.format("[CINE] first playthrough took %.2f s of real time (timeline %.2f s)", os.clock() - state.wallStart - 0, T.duration)) end
+		state.hold = 0.8
 	end
-	hudText()
+	if hudOn then
+		local _, _, _, shot = camAt(frame)
+		hud.Visible = true
+		hud.Text = string.format(" frame %3d / %d  t=%.2fs  %s | shot: %s\n fx %s | camera %s | light %s | speed %.2fx %s\n R replay  Space pause  , . step  B slow  V fx  F fixed cam  N neutral light  C checks  H hide  Tab playable",
+			f, T.frames - 1, state.t, state.playing and "PLAY" or "PAUSED", shot, state.fx and "ON" or "OFF", state.fixed and "FIXED" or "SHOTS", state.neutral and "NEUTRAL" or "NIGHT", state.speed, "")
+	else
+		hud.Visible = false
+	end
 end)
 
-RunService:BindToRenderStep("ShowcaseCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
-	if not cinematicOn() then return end
+RunService:BindToRenderStep("BGCineCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	if not active() then return end
 	cam = Workspace.CurrentCamera
 	if not cam then return end
 	cam.CameraType = Enum.CameraType.Scriptable
-	local cf, fov = cameraTarget(state.t)
-	if not camCF then camCF, camFov = cf, fov end
-	local a = 1 - math.exp(-dt * 9)
-	camCF = camCF:Lerp(cf, a)
-	camFov = camFov + (fov - camFov) * a
-	cam.CFrame = camCF
-	cam.FieldOfView = camFov
+	local frame = state.t * T.fps
+	local pos, look, fov
+	if state.fixed then
+		pos, look, fov = Vector3.new(-1.5, 3.8, 18), Vector3.new(-1.5, 2.8, 0), 50
+	else
+		pos, look, fov = camAt(frame)
+	end
+	pos = pos + shakeAt(frame)
+	cam.CFrame = CFrame.lookAt(pos, look)
+	cam.FieldOfView = fov
+	fill.Position = pos + cam.CFrame.LookVector * 2
 end)
 
 ---------------------------------------------------------------- controls
-local function restart()
-	state.t = 0; state.hold = 0.3; state.inspect = 0; state.playing = true; state.marker = "start"
-	clothB:reset(); clothP:reset()
-end
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp or not cinematicOn() then return end
+	if gp or not active() then return end
 	local k = input.KeyCode
-	if k == Enum.KeyCode.R then
-		restart()
-	elseif k == Enum.KeyCode.V then
-		state.vfx = not state.vfx
-	elseif k == Enum.KeyCode.B then
-		state.speed = (state.speed == 1) and 0.25 or 1
-	elseif k == Enum.KeyCode.Space then
-		state.playing = not state.playing
-		if state.inspect > 0 then state.inspect = 0; state.playing = true end
-	elseif k == Enum.KeyCode.Comma and not state.playing then
-		state.t = math.max(0, state.t - 1 / 30)
-	elseif k == Enum.KeyCode.Period and not state.playing then
-		state.t = math.min(Data.duration, state.t + 1 / 30)
-	elseif k == Enum.KeyCode.C then
-		if state.inspect == 0 then
-			task.spawn(inspectContact)
-		elseif state.inspect == 1 then
-			state.inspect = 2
-		else
-			state.inspect = 0; state.playing = true
-		end
+	if k == Enum.KeyCode.R then resetPlayback(); state.playing = true
+	elseif k == Enum.KeyCode.Space then state.playing = not state.playing
+	elseif k == Enum.KeyCode.Comma then state.playing = false; state.t = math.max(0, state.t - 1 / T.fps)
+	elseif k == Enum.KeyCode.Period then state.playing = false; state.t = math.min(T.duration, state.t + 1 / T.fps)
+	elseif k == Enum.KeyCode.B then state.speed = (state.speed == 1) and 0.25 or 1
+	elseif k == Enum.KeyCode.V then state.fx = not state.fx; Style.setEnabled(state.fx)
+	elseif k == Enum.KeyCode.F then state.fixed = not state.fixed
+	elseif k == Enum.KeyCode.N then state.neutral = not state.neutral; Look.apply(state.neutral and "neutral" or "night"); Look.audit()
+	elseif k == Enum.KeyCode.H then hudOn = not hudOn; stage:SetAttribute("UIVisible", hudOn)
+	elseif k == Enum.KeyCode.C then task.spawn(runChecks)
 	end
 end)
 
-task.spawn(function()
-	task.wait(0.6)
-	local keep = state.playing
-	state.playing = false
-	state.t = Data.contacts[1].t
-	RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
-	local gap = actualGap()
-	results.contactGap = gap
-	print(string.format("[SHOWCASE CHECK] clash: fist-to-forearm gap = %.3f studs (0 = touching, negative = overlap)", gap))
-	state.t = Data.contacts[2].t
-	RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait(); RunService.RenderStepped:Wait()
-	local c2 = Data.contacts[2]
-	local hand2 = fighters[c2.attacker][(c2.hand == "R" and "Right" or "Left") .. "Hand"].Position
-	results.counterMiss = (hand2 - info[2].Hc).Magnitude
-	print(string.format("[SHOWCASE CHECK] counter: fist-to-target miss = %.3f studs", results.counterMiss))
-	state.t = 0; state.hold = 0.4; state.playing = keep
-end)
-
-print("[SHOWCASE] Director running. Pass 1 plays with VFX OFF, pass 2 with VFX ON. Keys: R V B Space , . C")
-stage:GetAttributeChangedSignal("Mode"):Connect(function()
-	if cinematicOn() then restart(); state.pass = 1; state.vfx = false end
-end)
-
--- buttons from the BGClient panel (they set stage attribute CinCmd = "<command>:<time>")
+-- buttons from the control panel (BGClient) arrive as stage attribute CinCmd = "<command>:<time>"
 stage:GetAttributeChangedSignal("CinCmd"):Connect(function()
-	if not cinematicOn() then return end
+	if not active() then return end
 	local cmd = tostring(stage:GetAttribute("CinCmd")):match("^(%a+)")
-	if cmd == "replay" then restart()
+	if cmd == "replay" then resetPlayback(); state.playing = true
 	elseif cmd == "slow" then state.speed = (state.speed == 1) and 0.25 or 1
-	elseif cmd == "vfx" then state.vfx = not state.vfx
-	elseif cmd == "inspect" then
-		if state.inspect == 0 then task.spawn(inspectContact)
-		elseif state.inspect == 1 then state.inspect = 2
-		else state.inspect = 0; state.playing = true end
-	end
+	elseif cmd == "vfx" then state.fx = not state.fx; Style.setEnabled(state.fx)
+	elseif cmd == "inspect" then task.spawn(runChecks) end
 end)
+stage:GetAttributeChangedSignal("Mode"):Connect(function() if active() then wasActive = false end end)
+print("[CINE] ready: 6.0 s timeline (180 frames @ 30 fps). H shows the HUD, Tab switches to playable.")
 ]====])
 print("[BG] installed. Press Test > Play. It opens in the cinematic replay; press Tab or the Playable button to fight.")

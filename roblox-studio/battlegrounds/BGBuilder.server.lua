@@ -61,10 +61,10 @@ end
 
 ---------------------------------------------------------------- stage: moonlit stone arena
 Lighting.ClockTime = 0
-Lighting.Brightness = 1.7
-Lighting.ExposureCompensation = 0.45
-Lighting.Ambient = Color3.fromRGB(62, 66, 105)
-Lighting.OutdoorAmbient = Color3.fromRGB(78, 82, 125)
+Lighting.Brightness = 1.3
+Lighting.ExposureCompensation = 0
+Lighting.Ambient = Color3.fromRGB(60, 66, 100)
+Lighting.OutdoorAmbient = Color3.fromRGB(70, 76, 112)
 
 local function fx(inst)
 	inst:SetAttribute("ShowcaseFX", true)
@@ -75,13 +75,13 @@ local atmo = Instance.new("Atmosphere")
 atmo.Density = 0.28; atmo.Offset = 0.2; atmo.Color = Color3.fromRGB(100, 110, 175); atmo.Decay = Color3.fromRGB(40, 45, 90)
 fx(atmo)
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.9; bloom.Size = 26; bloom.Threshold = 0.9
+bloom.Intensity = 0.25; bloom.Size = 12; bloom.Threshold = 1.9
 fx(bloom)
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.28; cc.Saturation = -0.2; cc.TintColor = Color3.fromRGB(225, 228, 255)   -- high contrast, desaturated world: blue and violet are the only colours
+cc.Contrast = 0.08; cc.Saturation = -0.05; cc.TintColor = Color3.fromRGB(235, 238, 255)
 fx(cc)
 local dof = Instance.new("DepthOfFieldEffect")
-dof.FarIntensity = 0.12; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28
+dof.FarIntensity = 0.1; dof.NearIntensity = 0; dof.FocusDistance = 14; dof.InFocusRadius = 28; dof.Enabled = false
 fx(dof)
 
 local R = Config.arena.radius
@@ -90,20 +90,20 @@ part({ Name = "Ground", Size = Vector3.new(500, 1, 500), Position = Vector3.new(
 	Material = Enum.Material.Slate, CanCollide = true })
 -- raised stone disc
 part({ Name = "ArenaFloor", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, (R + 3) * 2, (R + 3) * 2),
-	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(30, 32, 44), Material = Enum.Material.Slate, Reflectance = 0.3, CanCollide = true })   -- dark glossy floor
+	CFrame = CFrame.new(0, -0.55, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(46, 48, 60), Material = Enum.Material.Slate, Reflectance = 0, CanCollide = true })   -- matte stone
 part({ Size = Vector3.new(0.1, (R + 3.4) * 2, (R + 3.4) * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, -0.02, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE3, Material = Enum.Material.Slate })
 part({ Size = Vector3.new(0.12, R * 2, R * 2), Shape = Enum.PartType.Cylinder,
 	CFrame = CFrame.new(0, 0.0, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = STONE2, Material = Enum.Material.Cobblestone })
--- engraved rings: restrained, so fighters stay the brightest things in the frame
-for _, spec in ipairs({ { R * 2 - 1, 0.5, BLUE }, { R * 1.3, 0.4, VIOLET }, { 7, 0.35, Color3.fromRGB(150, 160, 210) } }) do
+-- engraved rings: painted stone lines (matte), so only effect geometry glows
+for _, spec in ipairs({ { R * 2 - 1, BLUE }, { R * 1.3, VIOLET }, { 7, Color3.fromRGB(150, 160, 210) } }) do
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, spec[1], spec[1]), CFrame = CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = spec[3], Material = Enum.Material.Neon, Transparency = 0.82 })
+		Color = spec[2]:Lerp(STONE2, 0.7), Material = Enum.Material.Concrete })
 	part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, spec[1] - 0.35, spec[1] - 0.35), CFrame = CFrame.new(0, 0.06, 0) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = STONE2, Material = Enum.Material.Cobblestone })
+		Color = STONE2, Material = Enum.Material.Concrete })
 end
 part({ Name = "Moon", Shape = Enum.PartType.Ball, Size = Vector3.new(70, 70, 70), Position = Vector3.new(-70, 140, -260),
-	Color = Color3.fromRGB(225, 232, 255), Material = Enum.Material.Neon, Transparency = 0.05 })
+	Color = Color3.fromRGB(200, 208, 232), Material = Enum.Material.SmoothPlastic, Transparency = 0 })
 
 math.randomseed(7)
 -- broken wall ring and pillars
@@ -185,7 +185,7 @@ local function cloth(model, onPart, chain, attach, count, size, color, lining)
 		m:SetAttribute("Depth", i)
 		m.Parent = seg
 		if lining then
-			local l = part({ Size = Vector3.new(size.X * 0.92, size.Y * 0.96, 0.05), Color = lining, Material = Enum.Material.Neon, Transparency = 0.55 }, model)
+			local l = part({ Size = Vector3.new(size.X * 0.92, size.Y * 0.96, 0.05), Color = lining, Material = Enum.Material.Fabric, Transparency = 0 }, model)
 			l:SetAttribute("Lining", true)
 			weld(l, seg, CFrame.new(0, 0, -size.Z / 2 - 0.02))
 		end
@@ -228,150 +228,151 @@ local function newRig(name, colors)
 	return m
 end
 
--- Blocky expressive face made of thin parts on the front of the head.
--- cfg: eye = {w,h}, pupil = {w,h}, brow = {w,h,tiltDeg,y}, mouth = {w,tiltDeg,y}, irisColor
+-- Blocky expressive face made of thin parts on the front of the head. Irises and pupils hang off Motor6Ds (EyeJoint) so
+-- the cinematic can move the eyes before the head turns. cfg: eye {w,h}, pupil {w,h}, brow {w,h,tiltDeg,y}, mouth {w,tiltDeg,y}, irisColor, browColor.
+local function movable(model, size, offset, color, tag)
+	local head = model:FindFirstChild("Head")
+	local p = part({ Size = size, Color = color, Material = Enum.Material.SmoothPlastic, Anchored = false, Massless = true }, model)
+	local m = Instance.new("Motor6D")
+	m.Name = "EyeJoint"
+	m.Part0, m.Part1, m.C0 = head, p, offset
+	m:SetAttribute("EyeJoint", true)
+	m.Parent = p
+	if tag then p:SetAttribute(tag, true) end
+	return p
+end
 local function face(model, cfg)
 	local dark = Color3.fromRGB(18, 16, 20)
 	for _, s in ipairs({ -1, 1 }) do
 		local ex = s * 0.29
-		accessory(model, "Head", Vector3.new(cfg.eye[1], cfg.eye[2], 0.04), CFrame.new(ex, 0.08, -0.61), Color3.fromRGB(246, 246, 250), Enum.Material.SmoothPlastic)
-		accessory(model, "Head", Vector3.new(cfg.pupil[1], cfg.pupil[2], 0.05), CFrame.new(ex - s * 0.02, 0.07, -0.625), cfg.irisColor, Enum.Material.SmoothPlastic, "Eye")
-		accessory(model, "Head", Vector3.new(cfg.pupil[1] * 0.45, cfg.pupil[2] * 0.45, 0.055), CFrame.new(ex - s * 0.02, 0.07, -0.63), dark)
-		-- eyebrows tilt toward the nose and down = focused / stern
+		accessory(model, "Head", Vector3.new(cfg.eye[1], cfg.eye[2], 0.04), CFrame.new(ex, 0.08, -0.61), Color3.fromRGB(240, 240, 244), Enum.Material.SmoothPlastic)
+		movable(model, Vector3.new(cfg.pupil[1], cfg.pupil[2], 0.05), CFrame.new(ex - s * 0.02, 0.07, -0.625), cfg.irisColor, "Eye")
+		movable(model, Vector3.new(cfg.pupil[1] * 0.45, cfg.pupil[2] * 0.45, 0.055), CFrame.new(ex - s * 0.02, 0.07, -0.63), dark)
 		accessory(model, "Head", Vector3.new(cfg.brow[1], cfg.brow[2], 0.05),
 			CFrame.new(ex, cfg.brow[4], -0.615) * CFrame.Angles(0, 0, math.rad(-s * cfg.brow[3])), cfg.browColor or dark, Enum.Material.SmoothPlastic, "Brow")
 	end
 	accessory(model, "Head", Vector3.new(cfg.mouth[1], 0.05, 0.04), CFrame.new(0.02, cfg.mouth[3], -0.61) * CFrame.Angles(0, 0, math.rad(cfg.mouth[2])), dark)
 end
 
--- KAEL (Blue): slightly leaner, dark swept-back spiky hair with one blue lock, warm tan face, navy fitted combat jacket with cyan piping,
--- short two-tail scarf, black belt with silver buckle, tapered dark pants, charcoal boots, fingerless gloves, slim right forearm guard.
+local MAT = Enum.Material.Fabric       -- clothing and hair are matte; nothing on a character is Neon except the one cyan seam on Kael
+
+-- KAEL: broad blocky torso (wide shirt, wide shoulders), matte black swept-back hair with a fringe, warm tan face, fitted navy shirt,
+-- short asymmetric scarf, charcoal pants, squared boots. ONE cyan seam on the right sleeve, and a compact angular bracer on the right forearm.
 local function buildKael()
-	local m = newRig("Blue", { skin = Color3.fromRGB(222, 170, 124), torso = Color3.fromRGB(26, 34, 66),
-		arm = Color3.fromRGB(26, 34, 66), leg = Color3.fromRGB(26, 28, 38) })
+	local skin = Color3.fromRGB(214, 160, 116)
+	local m = newRig("Blue", { skin = skin, torso = Color3.fromRGB(28, 36, 68), arm = Color3.fromRGB(28, 36, 68), leg = Color3.fromRGB(48, 50, 58) })
 	m:SetAttribute("Character", "Kael")
-	local navy, deep, black = Color3.fromRGB(26, 34, 66), Color3.fromRGB(18, 22, 44), Color3.fromRGB(14, 14, 18)
-	local char = Color3.fromRGB(50, 52, 62)
-	local hairC = Color3.fromRGB(22, 20, 30)
-	-- hair: cap + swept-back spikes in layers, one blue lock near the fringe
-	accessory(m, "Head", Vector3.new(1.3, 0.5, 1.3), CFrame.new(0, 0.62, 0.02), hairC, nil, "Hair")
-	for i = 1, 7 do
-		local x = (i - 4) * 0.3
-		local h = 1.0 - math.abs(i - 4) * 0.1
-		accessory(m, "Head", Vector3.new(0.34, h, 0.5), CFrame.new(x, 0.78, 0.22) * CFrame.Angles(0.75, 0, -x * 0.5), hairC, nil, "Hair")
+	local navy, deep, char, black = Color3.fromRGB(28, 36, 68), Color3.fromRGB(20, 26, 50), Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 32)
+	local hairC = Color3.fromRGB(20, 18, 24)
+	accessory(m, "Head", Vector3.new(1.3, 0.5, 1.3), CFrame.new(0, 0.62, 0.04), hairC, MAT, "Hair")
+	for i = 1, 6 do          -- swept-back layers
+		local x = (i - 3.5) * 0.32
+		accessory(m, "Head", Vector3.new(0.34, 0.95 - math.abs(i - 3.5) * 0.12, 0.5), CFrame.new(x, 0.74, 0.28) * CFrame.Angles(0.8, 0, -x * 0.5), hairC, MAT, "Hair")
 	end
-	accessory(m, "Head", Vector3.new(0.3, 0.7, 0.45), CFrame.new(-0.6, 0.45, 0.2) * CFrame.Angles(0.5, 0, 0.35), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.3, 0.7, 0.45), CFrame.new(0.6, 0.45, 0.2) * CFrame.Angles(0.5, 0, -0.35), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.2, 0.55, 0.3), CFrame.new(-0.3, 0.7, -0.45) * CFrame.Angles(-0.5, 0, 0.1), BLUE, Enum.Material.SmoothPlastic, "Accent")   -- the blue lock
-	face(m, { eye = { 0.28, 0.2 }, pupil = { 0.16, 0.18 }, brow = { 0.36, 0.08, 16, 0.3 }, mouth = { 0.3, 5, -0.3 }, irisColor = Color3.fromRGB(38, 70, 120) })
-	-- fitted jacket, collar and piping
-	accessory(m, "UpperTorso", Vector3.new(2.05, 1.42, 1.08), CFrame.new(0, -0.05, 0.01), navy, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(2.1, 0.5, 1.1), CFrame.new(0, 0.74, 0), deep, Enum.Material.Fabric)                   -- collar band
-	accessory(m, "UpperTorso", Vector3.new(0.09, 1.3, 0.1), CFrame.new(0, -0.05, -0.58), Color3.fromRGB(170, 175, 195), Enum.Material.Metal)  -- zip
-	accessory(m, "UpperTorso", Vector3.new(2.14, 0.07, 1.14), CFrame.new(0, 0.66, 0), CYAN, Enum.Material.Neon, "Seam")           -- shoulder line piping
-	accessory(m, "UpperTorso", Vector3.new(0.07, 0.9, 0.07), CFrame.new(-0.5, -0.15, -0.58), CYAN, Enum.Material.Neon, "Seam")
-	accessory(m, "UpperTorso", Vector3.new(0.07, 0.9, 0.07), CFrame.new(0.5, -0.15, -0.58), CYAN, Enum.Material.Neon, "Seam")
-	accessory(m, "LowerTorso", Vector3.new(2.05, 0.4, 1.08), CFrame.new(0, 0.1, 0.01), navy, Enum.Material.Fabric)
-	accessory(m, "LowerTorso", Vector3.new(2.06, 0.2, 1.1), CFrame.new(0, -0.06, 0), black, Enum.Material.Leather)                 -- matte belt
-	accessory(m, "LowerTorso", Vector3.new(0.3, 0.2, 0.08), CFrame.new(0, -0.06, -0.57), Color3.fromRGB(205, 208, 220), Enum.Material.Metal) -- silver buckle
+	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(-0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, 0.3), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.34, 0.6, 0.45), CFrame.new(0.62, 0.4, 0.22) * CFrame.Angles(0.5, 0, -0.3), hairC, MAT, "Hair")
+	-- fringe: three separate locks above the brows, swept to the left
+	accessory(m, "Head", Vector3.new(0.45, 0.2, 0.4), CFrame.new(-0.4, 0.52, -0.5) * CFrame.Angles(-0.25, 0, 0.28), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.4, 0.2, 0.4), CFrame.new(0.02, 0.55, -0.52) * CFrame.Angles(-0.25, 0, 0.12), hairC, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.35, 0.18, 0.36), CFrame.new(0.4, 0.52, -0.5) * CFrame.Angles(-0.2, 0, -0.06), hairC, MAT, "Hair")
+	face(m, { eye = { 0.28, 0.2 }, pupil = { 0.15, 0.18 }, brow = { 0.36, 0.08, 14, 0.3 }, mouth = { 0.3, 4, -0.3 }, irisColor = Color3.fromRGB(70, 48, 36) })
+	-- broad torso: wide fitted navy shirt over the torso, broad shoulders
+	accessory(m, "UpperTorso", Vector3.new(2.5, 1.5, 1.12), CFrame.new(0, -0.03, 0.01), navy, MAT)
+	accessory(m, "UpperTorso", Vector3.new(2.62, 0.4, 1.16), CFrame.new(0, 0.62, 0.01), deep, MAT)                         -- shoulder yoke
+	accessory(m, "UpperTorso", Vector3.new(1.0, 0.3, 0.9), CFrame.new(0, 0.88, 0), skin, Enum.Material.SmoothPlastic)      -- neck
+	accessory(m, "LowerTorso", Vector3.new(2.2, 0.42, 1.12), CFrame.new(0, 0.1, 0.01), navy, MAT)
+	accessory(m, "LowerTorso", Vector3.new(2.22, 0.2, 1.14), CFrame.new(0, -0.08, 0), black, Enum.Material.Leather)        -- belt
 	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.12, 0.35, 1.12), CFrame.new(0, 0.48, 0), navy, Enum.Material.Fabric)                          -- angled shoulder
-		accessory(m, n, Vector3.new(1.16, 0.07, 1.16), CFrame.new(0, 0.3, 0), CYAN, Enum.Material.Neon, "Seam")
+		accessory(m, n, Vector3.new(1.3, 1.0, 1.3), CFrame.new(0, 0.12, 0), navy, MAT)                                        -- fitted sleeve
 	end
-	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		accessory(m, n, Vector3.new(1.06, 0.07, 1.06), CFrame.new(0, 0.3, 0), CYAN, Enum.Material.Neon, "Seam")                     -- forearm piping
-		accessory(m, n, Vector3.new(1.06, 0.07, 1.06), CFrame.new(0, -0.3, 0), CYAN, Enum.Material.Neon, "Seam")
-	end
-	local g = accessory(m, "RightLowerArm", Vector3.new(1.14, 0.65, 1.14), CFrame.new(0, -0.02, 0), char, Enum.Material.Metal, "Bracer")   -- slim right forearm guard
-	if g then g.Name = "KaelGuardR" end
-	accessory(m, "RightLowerArm", Vector3.new(1.18, 0.06, 1.18), CFrame.new(0, 0.25, 0), CYAN, Enum.Material.Neon, "Seam")
-	for _, n in ipairs({ "RightHand", "LeftHand" }) do
-		accessory(m, n, Vector3.new(1.02, 0.34, 1.02), CFrame.new(0, 0.12, 0), black, Enum.Material.Leather)                         -- fingerless glove
-	end
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.04, 1.1, 1.04), CFrame.new(0, 0, 0), Color3.fromRGB(28, 30, 40), Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do
-		accessory(m, n, Vector3.new(0.92, 0.95, 0.92), CFrame.new(0, 0.02, 0), Color3.fromRGB(28, 30, 40), Enum.Material.Fabric)      -- tapered
-		accessory(m, n, Vector3.new(1.1, 0.38, 1.1), CFrame.new(0, -0.45, 0), char, Enum.Material.Leather)                           -- boot cuff
-	end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.1, 0.7, 1.25), CFrame.new(0, 0.1, 0), char, Enum.Material.Leather) end
-	-- short scarf: collar wrap + two tails (third segment appears in power forms)
-	accessory(m, "UpperTorso", Vector3.new(1.7, 0.42, 1.25), CFrame.new(0, 0.9, 0.04), Color3.fromRGB(34, 44, 86), Enum.Material.Fabric)
-	local tailC = Color3.fromRGB(34, 44, 86)
-	for k, x in ipairs({ -0.32, 0.32 }) do
-		local last = cloth(m, "UpperTorso", "Scarf" .. k, CFrame.new(x, 0.78, 0.62), 3, Vector3.new(0.5, 0.55, 0.16), tailC)
-		if last then
-			last.Transparency = 1                      -- the long third segment is hidden until Charged Mode
-			last:SetAttribute("PowerSegment", true)
-			local trim = part({ Size = Vector3.new(0.5, 0.07, 0.17), Color = CYAN, Material = Enum.Material.Neon, Anchored = false, Massless = true }, m)
-			trim:SetAttribute("Seam", true)
-			weld(trim, m:FindFirstChild("Scarf" .. k .. 2) or last, CFrame.new(0, -0.27, 0))
-		end
-	end
+	-- the one cyan seam (right sleeve, outer edge) so the viewer can track his lead arm
+	accessory(m, "RightUpperArm", Vector3.new(0.07, 0.95, 0.07), CFrame.new(0.66, 0.12, 0), Color3.fromRGB(70, 215, 255), Enum.Material.Neon, "Seam")
+	-- compact angular bracer: a plate with a forward wedge, matte charcoal
+	local b1 = accessory(m, "RightLowerArm", Vector3.new(1.14, 0.62, 1.14), CFrame.new(0, 0.0, 0), char, Enum.Material.SmoothPlastic, "Bracer")
+	if b1 then b1.Name = "KaelBracer" end
+	accessory(m, "RightLowerArm", Vector3.new(0.5, 0.5, 0.42), CFrame.new(0, -0.02, -0.62) * CFrame.Angles(0.5, 0, 0), black, Enum.Material.SmoothPlastic, "Bracer")
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.06, 1.12, 1.06), CFrame.new(0, 0, 0), char, MAT) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(1.0, 1.0, 1.0), CFrame.new(0, 0.05, 0), char, MAT) end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.18, 0.78, 1.36), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather) end   -- squared boots
+	-- short asymmetric scarf: collar wrap + one long tail (3 segments) and one short tail (2 segments)
+	accessory(m, "UpperTorso", Vector3.new(1.7, 0.4, 1.25), CFrame.new(0, 0.95, 0.04), Color3.fromRGB(40, 50, 90), MAT)
+	local scarfC = Color3.fromRGB(40, 50, 90)
+	local longTail = cloth(m, "UpperTorso", "Scarf1", CFrame.new(-0.3, 0.86, 0.62), 3, Vector3.new(0.5, 0.55, 0.16), scarfC)
+	if longTail then longTail:SetAttribute("PowerSegment", true) end
+	cloth(m, "UpperTorso", "Scarf2", CFrame.new(0.34, 0.86, 0.62), 2, Vector3.new(0.5, 0.5, 0.16), scarfC)
 	addTrail(m, "RightHand", BLUE); addTrail(m, "LeftHand", BLUE)
 	return m
 end
 
--- REN (Purple): broader shoulders, lower and heavier, silver-lavender side-swept hair, stern square face,
--- black high-collar coat with a split hem and violet lining, charcoal pants, heavy square boots, reinforced bracers, angular back emblem.
+-- REN: slightly taller, lean silhouette (tall hair clumps and a narrower torso), silver hair in distinct clumps with grey shadows,
+-- visible brows and eyes, dark high collar below the mouth, charcoal split jacket, narrow violet cuffs. His face has its own light.
 local function buildRen()
-	local m = newRig("Purple", { skin = Color3.fromRGB(236, 200, 172), torso = Color3.fromRGB(16, 16, 22),
-		arm = Color3.fromRGB(20, 20, 28), leg = Color3.fromRGB(44, 46, 56) })
+	local skin = Color3.fromRGB(236, 204, 178)
+	local m = newRig("Purple", { skin = skin, torso = Color3.fromRGB(48, 50, 58), arm = Color3.fromRGB(48, 50, 58), leg = Color3.fromRGB(40, 42, 50) })
 	m:SetAttribute("Character", "Ren")
-	local black, coat, char = Color3.fromRGB(14, 14, 20), Color3.fromRGB(18, 18, 26), Color3.fromRGB(46, 48, 58)
-	local hairC = Color3.fromRGB(190, 184, 220)
-	-- hair: cap + a long slab swept to one side so the brows stay visible
-	accessory(m, "Head", Vector3.new(1.32, 0.5, 1.32), CFrame.new(0, 0.63, 0.02), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(1.0, 0.34, 1.0), CFrame.new(0.22, 0.88, -0.05) * CFrame.Angles(0, 0, -0.28), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.7, 0.3, 0.9), CFrame.new(0.62, 0.74, 0.0) * CFrame.Angles(0, 0, -0.5), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.5, 0.28, 0.5), CFrame.new(0.85, 0.52, -0.05) * CFrame.Angles(0, 0, -0.9), hairC, nil, "Hair")
-	accessory(m, "Head", Vector3.new(0.9, 0.18, 0.4), CFrame.new(0.2, 0.52, -0.45) * CFrame.Angles(-0.2, 0, -0.18), hairC, nil, "Hair")   -- fringe above the brows
-	accessory(m, "Head", Vector3.new(0.35, 0.6, 0.5), CFrame.new(-0.58, 0.3, 0.2), hairC, nil, "Hair")
-	face(m, { eye = { 0.3, 0.15 }, pupil = { 0.16, 0.14 }, brow = { 0.42, 0.1, 12, 0.28 }, mouth = { 0.32, 0, -0.3 }, irisColor = Color3.fromRGB(88, 70, 120), browColor = Color3.fromRGB(26, 22, 32) })
-	-- high-collar coat
-	accessory(m, "UpperTorso", Vector3.new(2.38, 1.5, 1.16), CFrame.new(0, -0.04, 0.01), coat, Enum.Material.Fabric)
-	accessory(m, "UpperTorso", Vector3.new(2.2, 0.8, 1.32), CFrame.new(0, 0.86, 0.02), black, Enum.Material.Fabric)                -- high collar
-	accessory(m, "UpperTorso", Vector3.new(0.12, 0.7, 1.34), CFrame.new(0, 0.86, 0), VIOLET, Enum.Material.Neon, "Seam", { Transparency = 1 })
-	accessory(m, "UpperTorso", Vector3.new(0.08, 1.35, 0.08), CFrame.new(0, -0.05, -0.6), Color3.fromRGB(60, 60, 78), Enum.Material.Metal)
-	accessory(m, "LowerTorso", Vector3.new(2.2, 0.42, 1.12), CFrame.new(0, 0.1, 0.01), coat, Enum.Material.Fabric)
-	accessory(m, "LowerTorso", Vector3.new(2.22, 0.2, 1.14), CFrame.new(0, -0.06, 0), black, Enum.Material.Leather)
-	-- angular emblem on the back: two nested chevron bars
-	for i, w in ipairs({ 1.0, 0.62 }) do
-		accessory(m, "UpperTorso", Vector3.new(w, 0.12, 0.05), CFrame.new(-w * 0.2, 0.25 - i * 0.32, 0.6) * CFrame.Angles(0, 0, 0.5), VIOLET, Enum.Material.Neon, "Emblem", { Transparency = 0.45 })
-		accessory(m, "UpperTorso", Vector3.new(w, 0.12, 0.05), CFrame.new(w * 0.2, 0.25 - i * 0.32, 0.6) * CFrame.Angles(0, 0, -0.5), VIOLET, Enum.Material.Neon, "Emblem", { Transparency = 0.45 })
+	local coat, dark, char = Color3.fromRGB(48, 50, 58), Color3.fromRGB(26, 26, 34), Color3.fromRGB(40, 42, 50)
+	local silver, shadowGrey = Color3.fromRGB(196, 200, 212), Color3.fromRGB(118, 122, 136)
+	-- hair clumps: each lit clump has a grey shadow clump tucked behind / under it
+	local clumps = {  -- pos, size, rot(x,y,z)
+		{ Vector3.new(0.0, 0.85, -0.2), Vector3.new(0.7, 0.75, 0.6), Vector3.new(-0.3, 0, 0.1) },
+		{ Vector3.new(-0.42, 0.9, 0.0), Vector3.new(0.5, 0.95, 0.55), Vector3.new(0, 0, 0.35) },
+		{ Vector3.new(0.42, 0.95, 0.0), Vector3.new(0.5, 1.05, 0.55), Vector3.new(0, 0, -0.35) },
+		{ Vector3.new(0.0, 1.05, 0.25), Vector3.new(0.6, 0.95, 0.6), Vector3.new(0.5, 0, 0.1) },
+		{ Vector3.new(-0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, 0.5) },
+		{ Vector3.new(0.62, 0.55, 0.1), Vector3.new(0.4, 0.8, 0.5), Vector3.new(0.1, 0, -0.5) },
+		{ Vector3.new(0.0, 0.5, 0.5), Vector3.new(1.1, 0.7, 0.4), Vector3.new(0.3, 0, 0) },
+	}
+	accessory(m, "Head", Vector3.new(1.3, 0.45, 1.3), CFrame.new(0, 0.62, 0.04), shadowGrey, MAT, "Hair")
+	for _, c in ipairs(clumps) do
+		accessory(m, "Head", c[2] * 0.95, CFrame.new(c[1] + Vector3.new(0, -0.12, 0.1)) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), shadowGrey, MAT, "Hair")   -- shadow clump
+		accessory(m, "Head", c[2], CFrame.new(c[1]) * CFrame.Angles(c[3].X, c[3].Y, c[3].Z), silver, MAT, "Hair")
 	end
-	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do
-		accessory(m, n, Vector3.new(1.34, 0.45, 1.34), CFrame.new(0, 0.45, 0), black, Enum.Material.Fabric)                         -- broad shoulder
-		accessory(m, n, Vector3.new(1.18, 0.9, 1.18), CFrame.new(0, -0.1, 0), coat, Enum.Material.Fabric)
-	end
-	-- reinforced bracers: width comes from the cinematic contact data so the clash geometry matches
-	local gw = Data.contacts[1].guardRadius * 2
+	-- fringe clumps above the brows (brows stay visible below them)
+	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(-0.3, 0.5, -0.5) * CFrame.Angles(-0.25, 0, 0.2), silver, MAT, "Hair")
+	accessory(m, "Head", Vector3.new(0.5, 0.2, 0.38), CFrame.new(0.25, 0.52, -0.5) * CFrame.Angles(-0.25, 0, -0.15), silver, MAT, "Hair")
+	face(m, { eye = { 0.3, 0.17 }, pupil = { 0.17, 0.15 }, brow = { 0.42, 0.1, 10, 0.3 }, mouth = { 0.3, 0, -0.3 }, irisColor = Color3.fromRGB(96, 118, 170), browColor = Color3.fromRGB(80, 82, 94) })
+	-- face light independent of any power: small, soft, white, no shadows
+	local head = m:FindFirstChild("Head")
+	local fl = Instance.new("PointLight")
+	fl.Name = "BGFaceLight"
+	fl.Range, fl.Brightness, fl.Color, fl.Shadows = 6, 0.6, Color3.fromRGB(255, 246, 238), false
+	fl.Parent = head
+	-- lean charcoal split jacket with a dark high collar below the mouth
+	accessory(m, "UpperTorso", Vector3.new(2.0, 1.5, 1.08), CFrame.new(0, -0.03, 0.01), coat, MAT)
+	accessory(m, "UpperTorso", Vector3.new(1.66, 0.62, 1.3), CFrame.new(0, 0.72, 0.0), dark, MAT)                           -- collar top sits just under the mouth
+	accessory(m, "UpperTorso", Vector3.new(0.08, 1.35, 0.08), CFrame.new(0, -0.05, -0.58), Color3.fromRGB(70, 72, 86), Enum.Material.SmoothPlastic)
+	accessory(m, "LowerTorso", Vector3.new(2.0, 0.42, 1.08), CFrame.new(0, 0.1, 0.01), coat, MAT)
+	accessory(m, "LowerTorso", Vector3.new(2.02, 0.18, 1.1), CFrame.new(0, -0.08, 0), dark, Enum.Material.Leather)
+	for _, n in ipairs({ "RightUpperArm", "LeftUpperArm" }) do accessory(m, n, Vector3.new(1.12, 1.0, 1.12), CFrame.new(0, 0.12, 0), coat, MAT) end
+	-- narrow violet cuffs (matte)
 	for _, n in ipairs({ "RightLowerArm", "LeftLowerArm" }) do
-		local la = m:FindFirstChild(n)
-		local g = accessory(m, n, Vector3.new(gw, la.Size.Y * 0.85, gw), CFrame.new(0, 0, 0), Color3.fromRGB(24, 24, 32), Enum.Material.Metal, "Bracer")
-		g.Name = (n == "LeftLowerArm") and "GuardL" or "GuardR"
-		for _, y in ipairs({ 0.3, -0.3 }) do
-			accessory(m, n, Vector3.new(gw + 0.04, 0.08, gw + 0.04), CFrame.new(0, la.Size.Y * y, 0), VIOLET, Enum.Material.Neon, "Seam", { Transparency = 1 })
-		end
-		accessory(m, n, Vector3.new(gw + 0.2, 0.5, gw + 0.2), CFrame.new(0, 0, 0), VIOLET, Enum.Material.Neon, "Accent", { Transparency = 1 })   -- translucent layer for Eclipse Form
+		accessory(m, n, Vector3.new(1.06, 0.14, 1.06), CFrame.new(0, -0.38, 0), Color3.fromRGB(140, 96, 220), Enum.Material.SmoothPlastic, "Seam")
 	end
-	for _, n in ipairs({ "RightHand", "LeftHand" }) do accessory(m, n, Vector3.new(1.04, 0.4, 1.04), CFrame.new(0, 0.1, 0), black, Enum.Material.Leather) end
-	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.16, 1.12, 1.16), CFrame.new(0, 0, 0), char, Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(1.1, 1.0, 1.1), CFrame.new(0, 0.02, 0), char, Enum.Material.Fabric) end
-	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.2, 0.8, 1.38), CFrame.new(0, 0.12, 0), black, Enum.Material.Leather) end   -- heavy square boots
-	-- split hem: two flaps at the back, violet lining shows when they swing
-	for k, x in ipairs({ -0.52, 0.52 }) do
-		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.95, 0.75, 0.14), coat, VIOLET)
-	end
-	-- two long hair tails from the back of the head: cloth chains that swing with the body
-	for k, x in ipairs({ -0.3, 0.3 }) do
-		cloth(m, "Head", "HT" .. k, CFrame.new(x, 0.15, 0.6), 3, Vector3.new(0.42, 1.0, 0.14), hairC)
-	end
-	for _, c in ipairs(m:GetChildren()) do
-		if c:IsA("BasePart") and c.Name:sub(1, 2) == "HT" then c:SetAttribute("Hair", true) end
+	for _, n in ipairs({ "RightUpperLeg", "LeftUpperLeg" }) do accessory(m, n, Vector3.new(1.0, 1.12, 1.0), CFrame.new(0, 0, 0), char, MAT) end
+	for _, n in ipairs({ "RightLowerLeg", "LeftLowerLeg" }) do accessory(m, n, Vector3.new(0.96, 1.0, 0.96), CFrame.new(0, 0.05, 0), char, MAT) end
+	for _, n in ipairs({ "RightFoot", "LeftFoot" }) do accessory(m, n, Vector3.new(1.1, 0.74, 1.3), CFrame.new(0, 0.1, 0), dark, Enum.Material.Leather) end
+	-- split jacket flaps behind (violet lining shows when they swing)
+	for k, x in ipairs({ -0.5, 0.5 }) do
+		cloth(m, "LowerTorso", "Hem" .. k, CFrame.new(x, -0.1, 0.56), 2, Vector3.new(0.92, 0.8, 0.14), coat, Color3.fromRGB(110, 70, 190))
 	end
 	addTrail(m, "RightHand", VIOLET); addTrail(m, "LeftHand", VIOLET)
-	addTrail(m, "RightLowerArm", VIOLET); addTrail(m, "LeftLowerArm", VIOLET)
 	return m
+end
+
+
+---------------------------------------------------------------- loose floor tiles (cinematic reacts through them)
+local tiles = Instance.new("Folder")
+tiles.Name = "Tiles"
+tiles.Parent = stage
+math.randomseed(21)
+for ix = -7, 7 do
+	for iz = -1, 1 do
+		local shade = math.random(60, 78)
+		local t = part({ Name = "Tile_" .. ix .. "_" .. iz, Size = Vector3.new(3.84, 0.5, 3.84), CFrame = CFrame.new(ix * 4, 0.02 - 0.25 + 0.02, iz * 4),
+			Color = Color3.fromRGB(shade, shade + 2, shade + 14), Material = Enum.Material.Slate }, tiles)
+		t:SetAttribute("Col", ix)
+		t:SetAttribute("Row", iz)
+	end
 end
 
 local kael = buildKael()

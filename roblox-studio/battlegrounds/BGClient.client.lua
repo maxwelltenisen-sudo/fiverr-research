@@ -758,6 +758,7 @@ buttonRow({ { "Reset fight", "reset" } }, function() ControlRE:FireServer("reset
 
 local function updatePanelVisibility()
 	local cinematic = not playing()
+	panel.Visible = playing() or stage:GetAttribute("UIVisible") == true      -- hidden during cinematic playback; H shows it
 	for _, c in ipairs(panel:GetChildren()) do
 		if c:IsA("Frame") then
 			local so, co = c:GetAttribute("StudioOnly"), c:GetAttribute("CinematicOnly")

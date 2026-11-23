@@ -30,7 +30,8 @@ end
 function Cloth:reset() self.prevPos = nil end
 
 -- utCF = world CFrame of the UpperTorso (or LowerTorso for hems); dt = simulated seconds this frame (0 when paused)
-function Cloth:update(utCF, dt)
+-- wind = extra forward-velocity-like push in studs/s (positive streams the cloth backward, e.g. a pull from behind)
+function Cloth:update(utCF, dt, wind)
 	local fwd = utCF:VectorToWorldSpace(Vector3.new(0, 0, -1))
 	local yaw = math.atan2(-fwd.X, -fwd.Z)
 	local pos = utCF.Position
@@ -44,6 +45,7 @@ function Cloth:update(utCF, dt)
 		vf = v:Dot(Vector3.new(fwd.X, 0, fwd.Z))
 		vl = v:Dot(Vector3.new(-fwd.Z, 0, fwd.X))
 	end
+	vf = vf + (wind or 0)
 	self.prevPos = pos
 	local now = os.clock()
 	for _, c in pairs(self.chains) do

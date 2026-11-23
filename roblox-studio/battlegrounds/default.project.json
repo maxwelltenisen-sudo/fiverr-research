@@ -11,7 +11,9 @@
       "BGCloth": { "$path": "BGCloth.lua" },
       "BGRig": { "$path": "BGRig.lua" },
       "BGStyle": { "$path": "BGStyle.lua" },
-      "BGCinematicData": { "$path": "BGCinematicData.lua" }
+      "BGCinematicData": { "$path": "BGCinematicData.lua" },
+      "BGTimeline": { "$path": "BGTimeline.lua" },
+      "BGLook": { "$path": "BGLook.lua" }
     },
     "ServerScriptService": {
       "$className": "ServerScriptService",
@@ -23,7 +25,7 @@
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "BGClient": { "$path": "BGClient.client.lua" },
-        "BGDirector": { "$path": "BGDirector.client.lua" }
+        "BGCine": { "$path": "BGCine.client.lua" }
       }
     }
   }

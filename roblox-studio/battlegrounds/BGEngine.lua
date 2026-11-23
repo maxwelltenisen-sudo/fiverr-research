@@ -318,7 +318,6 @@ function Engine.bake(R, data)
 	for ci, c in ipairs(data.contacts) do
 		local att, def_ = tracks[c.attacker], tracks[c.defender]
 		local ai = findKey(att, c.t)
-		local di = findKey(def_, c.t)
 		local aSide = c.hand == "R" and "Right" or "Left"
 		local Hc
 		local n
@@ -350,6 +349,23 @@ function Engine.bake(R, data)
 				att.anchor.z = att.anchor.z - (S.Z - want.Z)
 			end
 			bakeFeet(att)
+			setHandLocal(att, ai, c.hand, Hc)
+		elseif c.kind == "hover" then
+			-- attacker's fist stops `gap` studs short of the defender's open palm (the impossible stop)
+			bakeFeet(att)
+			local P = Engine.eval(R, def_, c.t)
+			local palm = P.hands[c.dhand].t
+			local k = att.keys[ai]
+			local nn = flat(V3.new(k.px - palm.X, 0, k.pz - palm.Z)).Unit
+			Hc = palm + nn * (c.gap + c.fist)
+			info[ci] = { C = palm, Hc = Hc, n = nn, plane = Hc + nn * c.fist, gap = c.gap, fist = c.fist }
+			setHandLocal(att, ai, c.hand, Hc)
+		elseif c.kind == "point" then
+			-- fist/wrist placed at an offset from an earlier contact's point (e.g. the bracer touching the field)
+			bakeFeet(att)
+			local ref = info[c.ref]
+			Hc = ref.Hc + V3.new(c.dx or 0, c.dy or 0, c.dz or 0)
+			info[ci] = { C = Hc, Hc = Hc, n = ref.n }
 			setHandLocal(att, ai, c.hand, Hc)
 		else
 			-- chest contact: strike the defender's upper torso front
